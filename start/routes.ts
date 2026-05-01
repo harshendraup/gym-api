@@ -1,0 +1,4 @@
+import '#start/routes/auth.routes'
+import '#start/routes/gym.routes'
+import '#start/routes/admin.routes'
+import '#start/routes/webhook.routes'

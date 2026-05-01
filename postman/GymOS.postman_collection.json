@@ -1,0 +1,544 @@
+{
+  "info": {
+    "name": "GymOS API",
+    "description": "Complete API collection for GymOS — Multi-Tenant Gym SaaS Platform\n\n## Setup\n1. Import this collection\n2. Import GymOS.postman_environment.json\n3. Select 'GymOS — Development' environment\n4. Run 'OTP Request' + 'OTP Verify' to get tokens (auto-saved)\n5. Set GYM_ID from the gym you belong to",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{ACCESS_TOKEN}}", "type": "string" }]
+  },
+  "variable": [
+    { "key": "BASE_URL", "value": "{{BASE_URL}}" }
+  ],
+  "item": [
+    {
+      "name": "🔐 Auth",
+      "item": [
+        {
+          "name": "OTP Request",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"{{TEST_PHONE}}\"\n}"
+            },
+            "url": { "raw": "{{BASE_URL}}/auth/otp/request", "host": ["{{BASE_URL}}"], "path": ["auth", "otp", "request"] }
+          }
+        },
+        {
+          "name": "OTP Verify",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.success) {",
+                  "  pm.environment.set('ACCESS_TOKEN', res.data.accessToken);",
+                  "  pm.environment.set('REFRESH_TOKEN', res.data.refreshToken);",
+                  "  if (res.data.gymContext) {",
+                  "    pm.environment.set('GYM_ID', res.data.gymContext.gymId);",
+                  "  }",
+                  "  console.log('✅ Tokens saved to environment');",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"{{TEST_PHONE}}\",\n  \"otp\": \"{{TEST_OTP}}\"\n}"
+            },
+            "url": { "raw": "{{BASE_URL}}/auth/otp/verify", "host": ["{{BASE_URL}}"], "path": ["auth", "otp", "verify"] }
+          }
+        },
+        {
+          "name": "Email Login (Admin)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.success) {",
+                  "  pm.environment.set('ACCESS_TOKEN', res.data.accessToken);",
+                  "  pm.environment.set('REFRESH_TOKEN', res.data.refreshToken);",
+                  "  if (res.data.gymContext) pm.environment.set('GYM_ID', res.data.gymContext.gymId);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"owner@mygym.com\",\n  \"password\": \"password123\"\n}"
+            },
+            "url": { "raw": "{{BASE_URL}}/auth/login", "host": ["{{BASE_URL}}"], "path": ["auth", "login"] }
+          }
+        },
+        {
+          "name": "Refresh Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.success) {",
+                  "  pm.environment.set('ACCESS_TOKEN', res.data.accessToken);",
+                  "  pm.environment.set('REFRESH_TOKEN', res.data.refreshToken);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"refreshToken\": \"{{REFRESH_TOKEN}}\"\n}" },
+            "url": { "raw": "{{BASE_URL}}/auth/refresh", "host": ["{{BASE_URL}}"], "path": ["auth", "refresh"] }
+          }
+        },
+        {
+          "name": "Get Me",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{BASE_URL}}/auth/me", "host": ["{{BASE_URL}}"], "path": ["auth", "me"] }
+          }
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"refreshToken\": \"{{REFRESH_TOKEN}}\"\n}" },
+            "url": { "raw": "{{BASE_URL}}/auth/logout", "host": ["{{BASE_URL}}"], "path": ["auth", "logout"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "👥 Members",
+      "item": [
+        {
+          "name": "List Members",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{BASE_URL}}/gyms/{{GYM_ID}}/members?page=1&perPage=20",
+              "host": ["{{BASE_URL}}"],
+              "path": ["gyms", "{{GYM_ID}}", "members"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "perPage", "value": "20" },
+                { "key": "status", "value": "active", "disabled": true },
+                { "key": "search", "value": "", "disabled": true }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Member",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{BASE_URL}}/gyms/{{GYM_ID}}/members/{{MEMBER_ID}}", "host": ["{{BASE_URL}}"], "path": ["gyms", "{{GYM_ID}}", "members", "{{MEMBER_ID}}"] }
+          }
+        },
+        {
+          "name": "Create Member",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.success) pm.environment.set('MEMBER_ID', res.data.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"John Doe\",\n  \"phone\": \"9876543210\",\n  \"email\": \"john@example.com\",\n  \"gender\": \"male\",\n  \"dateOfBirth\": \"1995-06-15\",\n  \"fitnessGoal\": \"muscle_gain\",\n  \"source\": \"walk_in\"\n}"
+            },
+            "url": { "raw": "{{BASE_URL}}/gyms/{{GYM_ID}}/members", "host": ["{{BASE_URL}}"], "path": ["gyms", "{{GYM_ID}}", "members"] }
+          }
+        },
+        {
+          "name": "Update Member",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"heightCm\": 175,\n  \"weightKg\": 72.5,\n  \"fitnessGoal\": \"weight_loss\"\n}" },
+            "url": { "raw": "{{BASE_URL}}/gyms/{{GYM_ID}}/members/{{MEMBER_ID}}", "host": ["{{BASE_URL}}"], "path": ["gyms", "{{GYM_ID}}", "members", "{{MEMBER_ID}}"] }
+          }
+        },
+        {
+          "name": "Member Stats",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{BASE_URL}}/gyms/{{GYM_ID}}/members/{{MEMBER_ID}}/stats", "host": ["{{BASE_URL}}"], "path": ["gyms", "{{GYM_ID}}", "members", "{{MEMBER_ID}}", "stats"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "💳 Memberships",
+      "item": [
+        {
+          "name": "List Plans",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{BASE_URL}}/gyms/{{GYM_ID}}/memberships/plans", "host": ["{{BASE_URL}}"], "path": ["gyms", "{{GYM_ID}}", "memberships", "plans"] }
+          }
+        },
+        {
+          "name": "Create Plan",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": ["const res = pm.response.json();", "if (res.success) pm.environment.set('PLAN_ID', res.data.id);"]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Monthly Basic\",\n  \"durationDays\": 30,\n  \"price\": 150000,\n  \"description\": \"Standard monthly membership\",\n  \"includesPt\": false,\n  \"maxFreezeDays\": 5\n}"
+            },
+            "url": { "raw": "{{BASE_URL}}/gyms/{{GYM_ID}}/memberships/plans", "host": ["{{BASE_URL}}"], "path": ["gyms", "{{GYM_ID}}", "memberships", "plans"] }
+          }
+        },
+        {
+          "name": "Subscribe Member (Cash)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": ["const res = pm.response.json();", "if (res.success) pm.environment.set('SUBSCRIPTION_ID', res.data.id);"]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"membershipPlanId\": \"{{PLAN_ID}}\",\n  \"gymMemberId\": \"{{MEMBER_ID}}\",\n  \"paymentMode\": \"cash\",\n  \"amountPaid\": 150000,\n  \"discountApplied\": 0\n}"
+            },
+            "url": { "raw": "{{BASE_URL}}/gyms/{{GYM_ID}}/memberships/subscribe", "host": ["{{BASE_URL}}"], "path": ["gyms", "{{GYM_ID}}", "memberships", "subscribe"] }
+          }
+        },
+        {
+          "name": "Freeze Membership",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"freezeDays\": 7,\n  \"reason\": \"Travelling\"\n}" },
+            "url": { "raw": "{{BASE_URL}}/gyms/{{GYM_ID}}/memberships/{{SUBSCRIPTION_ID}}/freeze", "host": ["{{BASE_URL}}"], "path": ["gyms", "{{GYM_ID}}", "memberships", "{{SUBSCRIPTION_ID}}", "freeze"] }
+          }
+        },
+        {
+          "name": "Expiring This Week",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{BASE_URL}}/gyms/{{GYM_ID}}/memberships/expiring?days=7", "host": ["{{BASE_URL}}"], "path": ["gyms", "{{GYM_ID}}", "memberships", "expiring"], "query": [{ "key": "days", "value": "7" }] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "💰 Payments",
+      "item": [
+        {
+          "name": "Create Razorpay Order",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"gymMemberId\": \"{{MEMBER_ID}}\",\n  \"subscriptionId\": \"{{SUBSCRIPTION_ID}}\",\n  \"amount\": 150000,\n  \"description\": \"Monthly membership renewal\"\n}"
+            },
+            "url": { "raw": "{{BASE_URL}}/gyms/{{GYM_ID}}/payments/order", "host": ["{{BASE_URL}}"], "path": ["gyms", "{{GYM_ID}}", "payments", "order"] }
+          }
+        },
+        {
+          "name": "Verify Payment",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"razorpayOrderId\": \"order_xxxxx\",\n  \"razorpayPaymentId\": \"pay_xxxxx\",\n  \"razorpaySignature\": \"<signature_from_sdk>\"\n}"
+            },
+            "url": { "raw": "{{BASE_URL}}/gyms/{{GYM_ID}}/payments/verify", "host": ["{{BASE_URL}}"], "path": ["gyms", "{{GYM_ID}}", "payments", "verify"] }
+          }
+        },
+        {
+          "name": "Record Offline Payment",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"gymMemberId\": \"{{MEMBER_ID}}\",\n  \"subscriptionId\": \"{{SUBSCRIPTION_ID}}\",\n  \"amount\": 150000,\n  \"method\": \"cash\",\n  \"referenceNumber\": \"CASH-001\"\n}"
+            },
+            "url": { "raw": "{{BASE_URL}}/gyms/{{GYM_ID}}/payments/offline", "host": ["{{BASE_URL}}"], "path": ["gyms", "{{GYM_ID}}", "payments", "offline"] }
+          }
+        },
+        {
+          "name": "List Transactions",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{BASE_URL}}/gyms/{{GYM_ID}}/payments/transactions?page=1", "host": ["{{BASE_URL}}"], "path": ["gyms", "{{GYM_ID}}", "payments", "transactions"], "query": [{ "key": "page", "value": "1" }] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "📋 Attendance",
+      "item": [
+        {
+          "name": "QR Check-In",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"qrToken\": \"<token_from_qr_code>\"\n}" },
+            "url": { "raw": "{{BASE_URL}}/gyms/{{GYM_ID}}/attendance/qr-checkin", "host": ["{{BASE_URL}}"], "path": ["gyms", "{{GYM_ID}}", "attendance", "qr-checkin"] }
+          }
+        },
+        {
+          "name": "Manual Check-In (Staff)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"gymMemberId\": \"{{MEMBER_ID}}\",\n  \"branchId\": \"{{BRANCH_ID}}\",\n  \"notes\": \"Staff manual check-in\"\n}"
+            },
+            "url": { "raw": "{{BASE_URL}}/gyms/{{GYM_ID}}/attendance/manual", "host": ["{{BASE_URL}}"], "path": ["gyms", "{{GYM_ID}}", "attendance", "manual"] }
+          }
+        },
+        {
+          "name": "Today's Attendance",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{BASE_URL}}/gyms/{{GYM_ID}}/attendance/today", "host": ["{{BASE_URL}}"], "path": ["gyms", "{{GYM_ID}}", "attendance", "today"] }
+          }
+        },
+        {
+          "name": "Monthly Report",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{BASE_URL}}/gyms/{{GYM_ID}}/attendance/report?year=2024&month=1",
+              "host": ["{{BASE_URL}}"],
+              "path": ["gyms", "{{GYM_ID}}", "attendance", "report"],
+              "query": [{ "key": "year", "value": "2024" }, { "key": "month", "value": "1" }]
+            }
+          }
+        },
+        {
+          "name": "Get Branch QR Code",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{BASE_URL}}/gyms/{{GYM_ID}}/attendance/qr?branchId={{BRANCH_ID}}", "host": ["{{BASE_URL}}"], "path": ["gyms", "{{GYM_ID}}", "attendance", "qr"], "query": [{ "key": "branchId", "value": "{{BRANCH_ID}}" }] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "📊 Analytics",
+      "item": [
+        {
+          "name": "Dashboard Summary",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{BASE_URL}}/gyms/{{GYM_ID}}/analytics/dashboard", "host": ["{{BASE_URL}}"], "path": ["gyms", "{{GYM_ID}}", "analytics", "dashboard"] }
+          }
+        },
+        {
+          "name": "Revenue Chart (12 months)",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{BASE_URL}}/gyms/{{GYM_ID}}/analytics/revenue?months=12", "host": ["{{BASE_URL}}"], "path": ["gyms", "{{GYM_ID}}", "analytics", "revenue"], "query": [{ "key": "months", "value": "12" }] }
+          }
+        },
+        {
+          "name": "Member Growth",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{BASE_URL}}/gyms/{{GYM_ID}}/analytics/members?months=6", "host": ["{{BASE_URL}}"], "path": ["gyms", "{{GYM_ID}}", "analytics", "members"], "query": [{ "key": "months", "value": "6" }] }
+          }
+        },
+        {
+          "name": "Attendance Heatmap",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{BASE_URL}}/gyms/{{GYM_ID}}/analytics/attendance?year=2024&month=1", "host": ["{{BASE_URL}}"], "path": ["gyms", "{{GYM_ID}}", "analytics", "attendance"], "query": [{ "key": "year", "value": "2024" }, { "key": "month", "value": "1" }] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "🔔 Notifications",
+      "item": [
+        {
+          "name": "List Notifications",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{BASE_URL}}/gyms/{{GYM_ID}}/notifications?page=1", "host": ["{{BASE_URL}}"], "path": ["gyms", "{{GYM_ID}}", "notifications"], "query": [{ "key": "page", "value": "1" }] }
+          }
+        },
+        {
+          "name": "Broadcast Announcement",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"New Year Offer! 🎉\",\n  \"body\": \"Get 20% off on all annual memberships this January!\",\n  \"targetAudience\": \"all\",\n  \"sendPush\": true\n}"
+            },
+            "url": { "raw": "{{BASE_URL}}/gyms/{{GYM_ID}}/notifications/broadcast", "host": ["{{BASE_URL}}"], "path": ["gyms", "{{GYM_ID}}", "notifications", "broadcast"] }
+          }
+        },
+        {
+          "name": "Register Device Token",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"token\": \"<fcm_device_token>\",\n  \"platform\": \"android\"\n}" },
+            "url": { "raw": "{{BASE_URL}}/gyms/{{GYM_ID}}/notifications/device-token", "host": ["{{BASE_URL}}"], "path": ["gyms", "{{GYM_ID}}", "notifications", "device-token"] }
+          }
+        },
+        {
+          "name": "Mark All Read",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{BASE_URL}}/gyms/{{GYM_ID}}/notifications/read-all", "host": ["{{BASE_URL}}"], "path": ["gyms", "{{GYM_ID}}", "notifications", "read-all"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "🏢 Gym Management",
+      "item": [
+        {
+          "name": "Get Gym Profile",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{BASE_URL}}/gyms/{{GYM_ID}}", "host": ["{{BASE_URL}}"], "path": ["gyms", "{{GYM_ID}}"] }
+          }
+        },
+        {
+          "name": "Get Gym Branding (Public)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "url": { "raw": "{{BASE_URL}}/gyms/{{GYM_ID}}/branding", "host": ["{{BASE_URL}}"], "path": ["gyms", "{{GYM_ID}}", "branding"] }
+          }
+        },
+        {
+          "name": "Update Gym",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tagline\": \"Train Hard. Live Strong.\",\n  \"primaryColor\": \"#6366F1\",\n  \"facilities\": [\"Parking\", \"Locker\", \"Steam Room\"],\n  \"timings\": {\n    \"mon\": { \"open\": \"05:00\", \"close\": \"22:00\" },\n    \"tue\": { \"open\": \"05:00\", \"close\": \"22:00\" }\n  }\n}"
+            },
+            "url": { "raw": "{{BASE_URL}}/gyms/{{GYM_ID}}", "host": ["{{BASE_URL}}"], "path": ["gyms", "{{GYM_ID}}"] }
+          }
+        },
+        {
+          "name": "List Branches",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{BASE_URL}}/gyms/{{GYM_ID}}/branches", "host": ["{{BASE_URL}}"], "path": ["gyms", "{{GYM_ID}}", "branches"] }
+          }
+        },
+        {
+          "name": "Create Branch",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": ["const res = pm.response.json();", "if (res.success) pm.environment.set('BRANCH_ID', res.data.id);"]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Main Branch\",\n  \"code\": \"HQ\",\n  \"phone\": \"9876543210\",\n  \"city\": \"Mumbai\",\n  \"state\": \"Maharashtra\",\n  \"pincode\": \"400001\",\n  \"isMainBranch\": true\n}"
+            },
+            "url": { "raw": "{{BASE_URL}}/gyms/{{GYM_ID}}/branches", "host": ["{{BASE_URL}}"], "path": ["gyms", "{{GYM_ID}}", "branches"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "🛡️ Super Admin",
+      "item": [
+        {
+          "name": "List All Gyms",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{BASE_URL}}/admin/gyms?page=1", "host": ["{{BASE_URL}}"], "path": ["admin", "gyms"], "query": [{ "key": "page", "value": "1" }] }
+          }
+        },
+        {
+          "name": "Verify Gym",
+          "request": {
+            "method": "PUT",
+            "url": { "raw": "{{BASE_URL}}/admin/gyms/{{GYM_ID}}/verify", "host": ["{{BASE_URL}}"], "path": ["admin", "gyms", "{{GYM_ID}}", "verify"] }
+          }
+        },
+        {
+          "name": "Platform Analytics",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{BASE_URL}}/admin/analytics/platform", "host": ["{{BASE_URL}}"], "path": ["admin", "analytics", "platform"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "🔗 Webhooks",
+      "item": [
+        {
+          "name": "Razorpay Webhook (simulate)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "x-razorpay-signature", "value": "<compute_with_webhook_secret>" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"event\": \"payment.captured\",\n  \"payload\": {\n    \"payment\": {\n      \"entity\": {\n        \"id\": \"pay_test_xxx\",\n        \"order_id\": \"order_test_xxx\",\n        \"amount\": 150000,\n        \"method\": \"upi\",\n        \"status\": \"captured\"\n      }\n    }\n  }\n}"
+            },
+            "url": { "raw": "{{BASE_URL}}/webhooks/razorpay", "host": ["{{BASE_URL}}"], "path": ["webhooks", "razorpay"] }
+          }
+        }
+      ]
+    }
+  ]
+}
