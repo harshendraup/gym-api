@@ -3,6 +3,28 @@ import logger from '@adonisjs/core/services/logger'
 import AuditLog from '#models/audit_log.model'
 import { NotificationService } from '#services/notification.service'
 
+declare module '@adonisjs/core/types' {
+  interface EventsList {
+    'membership:created': { subscription: any; plan: any }
+    'membership:activated': { subscription: any }
+    'membership:expired': { subscriptionId: string; gymId: string }
+    'membership:frozen': { subscription: any }
+    'payment:captured': { order: any }
+    'payment:failed': { orderId: string }
+    'attendance:marked': { record: any }
+    'audit:log': {
+      gymId: string | null
+      actorId: string | null
+      actorRole: string | null
+      action: string
+      entityType: string | null
+      entityId: string | null
+      ipAddress: string
+      userAgent: string | null
+    }
+  }
+}
+
 const notificationService = new NotificationService()
 
 // ─── Membership Events ────────────────────────────────────────────────────────

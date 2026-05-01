@@ -9,7 +9,7 @@ import DeviceToken from './device_token.model.js'
 
 export default class User extends BaseModel {
   static accessTokens = DbAccessTokensProvider.forModel(User, {
-    expiresIn: '15m',
+    expiresIn: '7d',
     prefix: 'gymos_',
   })
   static table = 'users'

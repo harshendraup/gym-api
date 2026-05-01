@@ -2,11 +2,7 @@ import vine from '@vinejs/vine'
 
 export const requestOtpValidator = vine.compile(
   vine.object({
-    phone: vine
-      .string()
-      .trim()
-      .regex(/^[6-9]\d{9}$/)
-      .withMessages({ regex: 'Enter a valid 10-digit Indian mobile number' }),
+    phone: vine.string().trim().regex(/^[6-9]\d{9}$/),
   })
 )
 

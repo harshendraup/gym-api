@@ -1,6 +1,8 @@
 import env from '#start/env'
 import { defineConfig } from '@adonisjs/core/logger'
 
+const isDev = env.get('NODE_ENV') === 'development'
+
 const loggerConfig = defineConfig({
   default: 'app',
   loggers: {
@@ -8,6 +10,18 @@ const loggerConfig = defineConfig({
       enabled: true,
       name: 'gymos',
       level: env.get('LOG_LEVEL', 'info'),
+      transport: isDev
+        ? {
+            target: 'pino-pretty',
+            options: {
+              colorize: true,
+              translateTime: 'HH:MM:ss',
+              ignore: 'pid,hostname,name',
+              messageFormat: '{msg}',
+              singleLine: false,
+            },
+          }
+        : undefined,
     },
   },
 })

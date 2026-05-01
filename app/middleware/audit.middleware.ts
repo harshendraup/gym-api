@@ -20,8 +20,8 @@ export default class AuditMiddleware {
     if (ctx.response.getStatus() >= 200 && ctx.response.getStatus() < 300) {
       emitter.emit('audit:log', {
         gymId: ctx['gymId'] ?? null,
-        actorId: ctx.auth.user?.id ?? null,
-        actorRole: ctx['currentRole'] ?? null,
+        actorId: ctx.auth?.user?.id ?? null,
+        actorRole: (ctx as any)['currentRole'] ?? null,
         action: `${ctx.request.method().toLowerCase()}.${ctx.route?.name ?? ctx.request.url()}`,
         entityType: null,
         entityId: null,
