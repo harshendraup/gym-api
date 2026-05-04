@@ -11,8 +11,14 @@ export default class AuthController {
    */
   async requestOtp({ request, response }: HttpContext) {
     const { phone } = await request.validateUsing(requestOtpValidator)
-    await authService.requestOtp(phone)
-    return response.ok({ success: true, data: { message: 'OTP sent successfully' } })
+    const result = await authService.requestOtp(phone)
+    return response.ok({
+      success: true,
+      data: {
+        message: 'OTP sent successfully',
+        ...(result.devOtp && { otp: result.devOtp, note: 'DEV mode only — not shown in production' }),
+      },
+    })
   }
 
   /**

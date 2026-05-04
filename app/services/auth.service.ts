@@ -24,10 +24,11 @@ export class AuthService {
   // OTP Flow
   // -------------------------------------------------------------------------
 
-  async requestOtp(phone: string): Promise<void> {
+  async requestOtp(phone: string): Promise<{ devOtp?: string }> {
     const otp = generateOtp()
     await this.otpService.storeOtp(phone, otp)
-    await this.otpService.sendSms(phone, otp)
+    const devOtp = await this.otpService.sendSms(phone, otp)
+    return devOtp ? { devOtp } : {}
   }
 
   async verifyOtpAndLogin(phone: string, otp: string): Promise<LoginResult> {

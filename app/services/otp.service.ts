@@ -54,16 +54,16 @@ export class OtpService {
     await redis.del(this.attemptsKey(phone))
   }
 
-  async sendSms(phone: string, otp: string): Promise<void> {
+  async sendSms(phone: string, otp: string): Promise<string | null> {
     // MSG91 integration
     const apiKey = env.get('MSG91_API_KEY')
     const senderId = env.get('MSG91_SENDER_ID')
     const templateId = env.get('MSG91_TEMPLATE_ID')
 
     if (!apiKey) {
-      // Dev mode — log OTP instead of sending
+      // Dev mode — log OTP and return it so the controller can expose it in the response
       logger.info(`[DEV] OTP for ${phone}: ${otp}`)
-      return
+      return otp
     }
 
     try {
@@ -86,5 +86,7 @@ export class OtpService {
       logger.error({ error, phone }, 'Failed to send OTP')
       throw new Error('OTP_SEND_FAILED')
     }
+
+    return null  // production — OTP sent via SMS, do not expose
   }
 }

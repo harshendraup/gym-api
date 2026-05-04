@@ -40,6 +40,7 @@ export default class MembersController {
 
   /**
    * POST /api/v1/gyms/:gymId/members
+   * Staff / gym-owner adds a member (auth required)
    */
   async store({ request, response, gymId, auth }: HttpContext) {
     const payload = await request.validateUsing(createMemberValidator)
@@ -52,6 +53,30 @@ export default class MembersController {
     })
 
     return response.created({ success: true, data: member.serialize() })
+  }
+
+  /**
+   * POST /api/v1/gyms/:gymId/members/register
+   * Public self-registration — no auth required
+   * gymId taken from URL param; also accepted in body (validated against URL value)
+   */
+  async publicStore({ request, response, params }: HttpContext) {
+    const payload = await request.validateUsing(createMemberValidator)
+    const gymId: string = params.gymId
+    const service = new MemberService()
+
+    try {
+      const member = await service.createMember({ gymId, ...payload })
+      return response.created({ success: true, data: member.serialize() })
+    } catch (err: any) {
+      if (err.message === 'MEMBER_ALREADY_EXISTS') {
+        return response.conflict({
+          success: false,
+          error: { code: 'MEMBER_ALREADY_EXISTS', message: 'You are already registered at this gym.' },
+        })
+      }
+      throw err
+    }
   }
 
   /**

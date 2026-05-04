@@ -187,3 +187,8 @@ router
   })
   .prefix('/api/v1/gyms/:gymId')
   .use([middleware.auth(), middleware.tenant()])
+
+// ─── Public: member self-registration (no auth required) ─────────────────────
+router
+  .post('/api/v1/gyms/:gymId/members/register', [MembersController, 'publicStore'])
+  .as('members.publicRegister')

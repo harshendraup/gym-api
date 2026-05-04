@@ -18,6 +18,9 @@ export default class User extends BaseModel {
   declare id: string
 
   @column()
+  declare gymId: string | null
+
+  @column()
   declare phone: string | null
 
   @column()

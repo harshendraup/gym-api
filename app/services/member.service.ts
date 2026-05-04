@@ -15,7 +15,7 @@ interface CreateMemberInput {
   phone?: string
   email?: string
   gender?: string
-  dateOfBirth?: string
+  dateOfBirth?: Date | string
   profilePhotoUrl?: string
   heightCm?: number
   weightKg?: number
@@ -24,7 +24,7 @@ interface CreateMemberInput {
   emergencyContactName?: string
   emergencyContactPhone?: string
   source?: string
-  createdBy: string
+  createdBy?: string  // optional — null when member self-registers
 }
 
 interface UpdateMemberInput {
@@ -58,12 +58,19 @@ export class MemberService {
             phone: input.phone ?? null,
             email: input.email ?? null,
             gender: input.gender as any ?? null,
-            dateOfBirth: input.dateOfBirth as any ?? null,
+            dateOfBirth: input.dateOfBirth
+              ? DateTime.fromJSDate(input.dateOfBirth as unknown as Date)
+              : null,
             profilePhotoUrl: input.profilePhotoUrl ?? null,
+            gymId: input.gymId,
             isActive: true,
           },
           { client: trx }
         )
+      } else if (!user.gymId) {
+        // Existing user registering at a gym for the first time — stamp their primary gym
+        user.gymId = input.gymId
+        await user.save()
       }
 
       // Check if already a member of this gym
