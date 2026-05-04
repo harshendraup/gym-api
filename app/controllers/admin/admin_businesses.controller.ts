@@ -1,3 +1,4 @@
+import { DateTime } from 'luxon'
 import type { HttpContext } from '@adonisjs/core/http'
 import Business from '#models/business.model'
 import {
@@ -23,6 +24,7 @@ export default class AdminBusinessesController {
         q.whereILike('name', `%${search}%`)
           .orWhereILike('legal_name', `%${search}%`)
           .orWhereILike('email', `%${search}%`)
+          .orWhereILike('business_key', `%${search}%`)
       })
     }
 
@@ -52,16 +54,29 @@ export default class AdminBusinessesController {
     const slug = string.slug(payload.name, { lower: true, strict: true })
 
     const existing = await Business.query().whereILike('slug', slug).whereNull('deleted_at').first()
-    if (existing) {
+    const finalSlug = existing ? `${slug}-${Date.now()}` : slug
+
+    // Use provided business_key or fall back to the generated slug
+    const businessKey = payload.business_key ?? finalSlug
+
+    const keyConflict = await Business.query()
+      .where('business_key', businessKey)
+      .whereNull('deleted_at')
+      .first()
+    if (keyConflict) {
       return response.conflict({
         success: false,
-        error: { code: 'SLUG_CONFLICT', message: 'A business with this name already exists.' },
+        error: {
+          code: 'BUSINESS_KEY_CONFLICT',
+          message: `business_key "${businessKey}" is already in use.`,
+        },
       })
     }
 
     const business = await Business.create({
       ...payload,
       slug,
+      businessKey,
       createdBy: user.id,
       status: 'pending',
       metadata: payload.metadata ?? {},
@@ -96,6 +111,24 @@ export default class AdminBusinessesController {
       business.slug = slug
     }
 
+    if (payload.business_key && payload.business_key !== business.businessKey) {
+      const keyConflict = await Business.query()
+        .where('business_key', payload.business_key)
+        .whereNull('deleted_at')
+        .whereNot('id', business.id)
+        .first()
+      if (keyConflict) {
+        return response.conflict({
+          success: false,
+          error: {
+            code: 'BUSINESS_KEY_CONFLICT',
+            message: `business_key "${payload.business_key}" is already in use.`,
+          },
+        })
+      }
+      business.businessKey = payload.business_key
+    }
+
     business.merge(payload)
     await business.save()
     await business.load('creator')
@@ -122,7 +155,7 @@ export default class AdminBusinessesController {
       .whereNull('deleted_at')
       .firstOrFail()
 
-    business.deletedAt = new Date() as any
+    business.deletedAt = DateTime.now()
     await business.save()
 
     return response.ok({ success: true, message: 'Business deleted successfully.' })

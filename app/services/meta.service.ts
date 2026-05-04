@@ -1,6 +1,7 @@
 import redis from '@adonisjs/redis/services/main'
 import Gym from '#models/gym.model'
 import GymAppConfig from '#models/gym_app_config.model'
+import Business from '#models/business.model'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -74,12 +75,7 @@ export class MetaService {
       return JSON.parse(cached) as MetaResponse
     }
 
-    const gym = await Gym.query()
-      .where('slug', input.businessKey)
-      .where('status', 'active')
-      .whereNull('deleted_at')
-      .preload('branches', (q) => q.where('is_active', true).whereNull('deleted_at'))
-      .firstOrFail()
+    const gym = await this.resolveGym(input.businessKey)
 
     const config = await GymAppConfig.query()
       .where('gym_id', gym.id)
@@ -162,6 +158,36 @@ export class MetaService {
   }
 
   // ─── Private ─────────────────────────────────────────────────────────────
+
+  private async resolveGym(businessKey: string): Promise<Gym> {
+    const branchQuery = (q: any) => q.where('is_active', true).whereNull('deleted_at')
+
+    // 1. Match against businesses.business_key → find gym via owner_id
+    const business = await Business.query()
+      .where('business_key', businessKey)
+      .where('status', 'active')
+      .whereNull('deleted_at')
+      .first()
+
+    if (business) {
+      const gym = await Gym.query()
+        .where('owner_id', business.createdBy)
+        .where('status', 'active')
+        .whereNull('deleted_at')
+        .preload('branches', branchQuery)
+        .first()
+
+      if (gym) return gym
+    }
+
+    // 2. Fall back: match against gyms.slug directly
+    return Gym.query()
+      .where('slug', businessKey)
+      .where('status', 'active')
+      .whereNull('deleted_at')
+      .preload('branches', branchQuery)
+      .firstOrFail()
+  }
 
   private buildMetaResponse(
     gym: Gym,

@@ -3,6 +3,12 @@ import vine from '@vinejs/vine'
 export const createBusinessValidator = vine.compile(
   vine.object({
     name: vine.string().trim().minLength(2).maxLength(150),
+    business_key: vine
+      .string()
+      .trim()
+      .maxLength(100)
+      .regex(/^[a-zA-Z0-9_-]+$/)
+      .optional(), // auto-generated from slug if not provided
     legalName: vine.string().trim().maxLength(255).optional(),
     registrationNumber: vine.string().trim().maxLength(100).optional(),
     type: vine.enum(['independent', 'chain', 'franchise']).optional(),
@@ -24,6 +30,12 @@ export const createBusinessValidator = vine.compile(
 export const updateBusinessValidator = vine.compile(
   vine.object({
     name: vine.string().trim().minLength(2).maxLength(150).optional(),
+    business_key: vine
+      .string()
+      .trim()
+      .maxLength(100)
+      .regex(/^[a-zA-Z0-9_-]+$/)
+      .optional(),
     legalName: vine.string().trim().maxLength(255).optional(),
     registrationNumber: vine.string().trim().maxLength(100).optional(),
     type: vine.enum(['independent', 'chain', 'franchise']).optional(),

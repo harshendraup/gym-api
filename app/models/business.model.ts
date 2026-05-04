@@ -19,6 +19,9 @@ export default class Business extends BaseModel {
   declare slug: string
 
   @column()
+  declare businessKey: string
+
+  @column()
   declare legalName: string | null
 
   @column()
