@@ -1,3 +1,4 @@
+import '#start/routes/meta.routes'
 import '#start/routes/auth.routes'
 import '#start/routes/gym.routes'
 import '#start/routes/admin.routes'

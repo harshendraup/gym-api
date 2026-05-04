@@ -5,6 +5,7 @@ import User from './user.model.js'
 import GymBranch from './gym_branch.model.js'
 import GymSubscription from './gym_subscription.model.js'
 import MembershipPlan from './membership_plan.model.js'
+import GymAppConfig from './gym_app_config.model.js'
 
 export default class Gym extends BaseModel {
   static table = 'gyms'
@@ -119,6 +120,9 @@ export default class Gym extends BaseModel {
 
   @hasMany(() => MembershipPlan)
   declare membershipPlans: HasMany<typeof MembershipPlan>
+
+  @hasOne(() => GymAppConfig)
+  declare appConfig: HasOne<typeof GymAppConfig>
 
   get brandingConfig() {
     return {

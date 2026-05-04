@@ -5,6 +5,7 @@ const AdminGymsController = () => import('#controllers/admin/admin_gyms.controll
 const AdminUsersController = () => import('#controllers/admin/admin_users.controller')
 const AdminAnalyticsController = () => import('#controllers/admin/admin_analytics.controller')
 const AdminBusinessesController = () => import('#controllers/admin/admin_businesses.controller')
+const MetaController = () => import('#controllers/meta/meta.controller')
 
 router
   .group(() => {
@@ -34,6 +35,10 @@ router
     router.put('/businesses/:id', [AdminBusinessesController, 'update']).as('admin.businesses.update')
     router.put('/businesses/:id/status', [AdminBusinessesController, 'updateStatus']).as('admin.businesses.status')
     router.delete('/businesses/:id', [AdminBusinessesController, 'destroy']).as('admin.businesses.destroy')
+
+    // App config — create / update / fetch per gym (busts meta cache on change)
+    router.get('/gyms/:gymId/app-config', [MetaController, 'getConfig']).as('admin.gyms.appConfig.show')
+    router.put('/gyms/:gymId/app-config', [MetaController, 'upsertConfig']).as('admin.gyms.appConfig.upsert')
   })
   .prefix('/api/v1/admin')
   .use([middleware.auth(), middleware.rbac(['super_admin'])])
