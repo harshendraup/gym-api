@@ -1,3 +1,4 @@
+import { DateTime } from 'luxon'
 import db from '@adonisjs/lucid/services/db'
 import emitter from '@adonisjs/core/services/emitter'
 import User from '#models/user.model'
@@ -93,7 +94,7 @@ export class MemberService {
           medicalNotes: input.medicalNotes ?? null,
           emergencyContactName: input.emergencyContactName ?? null,
           emergencyContactPhone: input.emergencyContactPhone ?? null,
-          joinedAt: new Date() as any,
+          joinedAt: DateTime.now(),
           source: input.source ?? null,
         },
         { client: trx }
@@ -156,7 +157,7 @@ export class MemberService {
       .whereNull('deleted_at')
       .firstOrFail()
 
-    member.deletedAt = new Date() as any
+    member.deletedAt = DateTime.now()
     await member.save()
 
     // Deactivate their gym role

@@ -1,0 +1,79 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: gymos_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: gymos
+      POSTGRES_PASSWORD: gymos_secret
+      POSTGRES_DB: gymos_dev
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gymos -d gymos_dev"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: gymos_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  minio:
+    image: minio/minio:latest
+    container_name: gymos_minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: gymos_minio
+      MINIO_ROOT_PASSWORD: gymos_minio_secret
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: gymos_api
+    ports:
+      - "3333:3333"
+    environment:
+      PORT: 3333
+      HOST: 0.0.0.0
+      NODE_ENV: development
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: gymos
+      DB_PASSWORD: gymos_secret
+      DB_DATABASE: gymos_dev
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      S3_ENDPOINT: http://minio:9000
+      S3_BUCKET: gymos-storage
+    volumes:
+      - .:/app
+      - /app/node_modules
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:

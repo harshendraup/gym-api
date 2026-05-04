@@ -10,6 +10,16 @@ const statusValidator = vine.compile(
   })
 )
 
+const createGymValidator = vine.compile(
+  vine.object({
+    name: vine.string().trim().minLength(2).maxLength(150),
+    email: vine.string().email().trim().optional(),
+    phone: vine.string().trim().optional(),
+    city: vine.string().trim().optional(),
+    state: vine.string().trim().optional(),
+  })
+)
+
 export default class AdminGymsController {
   async index({ request, response }: HttpContext) {
     const page = Number(request.qs().page ?? 1)
@@ -35,6 +45,43 @@ export default class AdminGymsController {
       data: gyms.all().map((g) => g.serialize()),
       meta: gyms.getMeta(),
     })
+  }
+
+  async store({ request, response, auth }: HttpContext) {
+    const payload = await request.validateUsing(createGymValidator)
+    const adminUser = auth.getUserOrFail()
+
+    const slug = payload.name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '')
+
+    const slugExists = await db.from('gyms').whereILike('slug', slug).first()
+    const finalSlug = slugExists ? `${slug}-${Date.now()}` : slug
+
+    const gymCode = payload.name
+      .replace(/[^a-zA-Z0-9]/g, '')
+      .toUpperCase()
+      .slice(0, 6)
+      .padEnd(4, '0')
+
+    const codeExists = await db.from('gyms').where('gym_code', gymCode).first()
+    const finalCode = codeExists ? gymCode + Math.floor(Math.random() * 90 + 10) : gymCode
+
+    const gym = await Gym.create({
+      name: payload.name,
+      slug: finalSlug,
+      gymCode: finalCode,
+      email: payload.email ?? null,
+      phone: payload.phone ?? null,
+      city: payload.city ?? null,
+      state: payload.state ?? null,
+      ownerId: adminUser.id,
+      status: 'active',
+      isVerified: true,
+    })
+
+    return response.created({ success: true, data: gym.serialize() })
   }
 
   async show({ params, response }: HttpContext) {

@@ -9,6 +9,7 @@ const AdminBusinessesController = () => import('#controllers/admin/admin_busines
 router
   .group(() => {
     router.get('/gyms', [AdminGymsController, 'index']).as('admin.gyms.index')
+    router.post('/gyms', [AdminGymsController, 'store']).as('admin.gyms.store')
     router.get('/gyms/:id', [AdminGymsController, 'show']).as('admin.gyms.show')
     router.put('/gyms/:id/status', [AdminGymsController, 'updateStatus']).as('admin.gyms.status')
     router.put('/gyms/:id/verify', [AdminGymsController, 'verify']).as('admin.gyms.verify')
@@ -18,6 +19,10 @@ router
     router.get('/users/:id', [AdminUsersController, 'show']).as('admin.users.show')
     router.post('/users/:id/suspend', [AdminUsersController, 'suspend']).as('admin.users.suspend')
     router.post('/users/:id/unsuspend', [AdminUsersController, 'unsuspend']).as('admin.users.unsuspend')
+
+    router.get('/gym-owners', [AdminUsersController, 'listGymOwners']).as('admin.gymOwners.index')
+    router.post('/gym-owners', [AdminUsersController, 'createGymOwner']).as('admin.gymOwners.store')
+    router.delete('/gym-owners/:id', [AdminUsersController, 'removeGymOwner']).as('admin.gymOwners.destroy')
 
     router.get('/analytics/platform', [AdminAnalyticsController, 'platform']).as('admin.analytics')
     router.get('/analytics/revenue', [AdminAnalyticsController, 'revenue']).as('admin.revenue')

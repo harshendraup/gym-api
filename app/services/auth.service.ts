@@ -130,9 +130,20 @@ export class AuthService {
   private async resolveGymContext(
     userId: string
   ): Promise<{ gymId: string; role: string } | null> {
+    const superAdmin = await UserGymRole.query()
+      .where('user_id', userId)
+      .where('role', 'super_admin')
+      .where('is_active', true)
+      .first()
+
+    if (superAdmin) {
+      return { gymId: superAdmin.gymId ?? '', role: 'super_admin' }
+    }
+
     const roles = await UserGymRole.query()
       .where('user_id', userId)
       .where('is_active', true)
+      .whereNotNull('gym_id')
       .limit(2)
 
     if (roles.length === 1) {
