@@ -31,6 +31,7 @@
     "@vinejs/vine": "^2.1.0",
     "bcrypt": "^6.0.0",
     "bullmq": "^5.13.2",
+    "cors": "^2.8.6",
     "firebase-admin": "^12.3.0",
     "luxon": "^3.4.4",
     "nanoid": "^5.0.7",

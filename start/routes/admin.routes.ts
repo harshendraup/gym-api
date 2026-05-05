@@ -5,6 +5,7 @@ const AdminGymsController = () => import('#controllers/admin/admin_gyms.controll
 const AdminUsersController = () => import('#controllers/admin/admin_users.controller')
 const AdminAnalyticsController = () => import('#controllers/admin/admin_analytics.controller')
 const AdminBusinessesController = () => import('#controllers/admin/admin_businesses.controller')
+const AdminBusinessAdminsController = () => import('#controllers/admin/admin_business_admins.controller')
 const MetaController = () => import('#controllers/meta/meta.controller')
 
 router
@@ -35,6 +36,13 @@ router
     router.put('/businesses/:id', [AdminBusinessesController, 'update']).as('admin.businesses.update')
     router.put('/businesses/:id/status', [AdminBusinessesController, 'updateStatus']).as('admin.businesses.status')
     router.delete('/businesses/:id', [AdminBusinessesController, 'destroy']).as('admin.businesses.destroy')
+
+    // Business Admins
+    router.get('/business-admins', [AdminBusinessAdminsController, 'index']).as('admin.businessAdmins.index')
+    router.post('/business-admins', [AdminBusinessAdminsController, 'store']).as('admin.businessAdmins.store')
+    router.get('/business-admins/:id', [AdminBusinessAdminsController, 'show']).as('admin.businessAdmins.show')
+    router.put('/business-admins/:id', [AdminBusinessAdminsController, 'update']).as('admin.businessAdmins.update')
+    router.delete('/business-admins/:id', [AdminBusinessAdminsController, 'destroy']).as('admin.businessAdmins.destroy')
 
     // App config — create / update / fetch per gym (busts meta cache on change)
     router.get('/gyms/:gymId/app-config', [MetaController, 'getConfig']).as('admin.gyms.appConfig.show')
