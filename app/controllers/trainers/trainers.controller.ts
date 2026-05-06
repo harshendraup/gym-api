@@ -1,61 +1,42 @@
 import type { HttpContext } from '@adonisjs/core/http'
 import vine from '@vinejs/vine'
 import db from '@adonisjs/lucid/services/db'
+import hash from '@adonisjs/core/services/hash'
 
-const createTrainerValidator = vine.compile(
+const inviteTrainerValidator = vine.compile(
   vine.object({
-    userId: vine.string().uuid().optional(),
+    fullName: vine.string().trim().minLength(2).maxLength(100),
+    email: vine.string().trim().email().normalizeEmail(),
     phone: vine.string().trim().optional(),
-    fullName: vine.string().trim().minLength(2).maxLength(100).optional(),
+    password: vine.string().minLength(6),
     specializations: vine.array(vine.string().trim()).optional(),
     experience: vine.number().min(0).optional(),
     bio: vine.string().trim().optional(),
-    branchIds: vine.array(vine.string().uuid()).optional(),
   })
 )
 
 const updateTrainerValidator = vine.compile(
   vine.object({
+    fullName: vine.string().trim().minLength(2).maxLength(100).optional(),
     specializations: vine.array(vine.string().trim()).optional(),
     experience: vine.number().min(0).optional(),
     bio: vine.string().trim().optional(),
-    branchIds: vine.array(vine.string().uuid()).optional(),
     isActive: vine.boolean().optional(),
   })
 )
 
 export default class TrainersController {
   async index({ request, response, gymId }: HttpContext) {
-    const { search, branchId, page = 1, limit = 20 } = request.qs()
+    const { search, page = 1, limit = 20 } = request.qs()
 
     let query = db
-      .from('user_gym_roles as ugr')
-      .join('users as u', 'u.id', 'ugr.user_id')
-      .leftJoin('gym_members as gm', (q) => {
-        q.on('gm.user_id', 'ugr.user_id').andOn('gm.gym_id', 'ugr.gym_id')
-      })
-      .where('ugr.gym_id', gymId)
-      .where('ugr.role', 'trainer')
-      .where('ugr.is_active', true)
-      .select(
-        'ugr.id',
-        'ugr.user_id',
-        'ugr.metadata',
-        'ugr.created_at',
-        'u.full_name',
-        'u.email',
-        'u.phone',
-        'u.avatar_url',
-        'gm.id as gym_member_id'
-      )
+      .from('users')
+      .where('role', 'trainer')
+      .where('gym_id', gymId)
+      .where('is_active', true)
+      .select('id', 'full_name', 'email', 'phone', 'profile_photo_url', 'metadata', 'created_at')
 
-    if (search) {
-      query = query.whereILike('u.full_name', `%${search}%`)
-    }
-
-    if (branchId) {
-      query = query.whereRaw(`ugr.metadata->>'branchIds' @> ?::jsonb`, [JSON.stringify([branchId])])
-    }
+    if (search) query = query.whereILike('full_name', `%${search}%`)
 
     const trainers = await query.paginate(Number(page), Number(limit))
     return response.ok({ success: true, data: trainers })
@@ -63,20 +44,19 @@ export default class TrainersController {
 
   async show({ params, response, gymId }: HttpContext) {
     const trainer = await db
-      .from('user_gym_roles as ugr')
-      .join('users as u', 'u.id', 'ugr.user_id')
-      .where('ugr.gym_id', gymId)
-      .where('ugr.role', 'trainer')
-      .where('ugr.id', params.id)
-      .select('ugr.*', 'u.full_name', 'u.email', 'u.phone', 'u.avatar_url')
+      .from('users')
+      .where('id', params.id)
+      .where('role', 'trainer')
+      .where('gym_id', gymId)
+      .select('id', 'full_name', 'email', 'phone', 'profile_photo_url', 'metadata', 'is_active', 'created_at')
       .first()
 
     if (!trainer) return response.notFound({ success: false, error: { code: 'NOT_FOUND', message: 'Trainer not found' } })
 
     const [memberCount, workoutPlans, dietPlans] = await Promise.all([
-      db.from('gym_members').where('gym_id', gymId).where('trainer_id', trainer.user_id).count('id as count').first(),
-      db.from('workout_plans').where('gym_id', gymId).where('trainer_id', trainer.user_id).where('is_active', true).count('id as count').first(),
-      db.from('diet_plans').where('gym_id', gymId).where('trainer_id', trainer.user_id).where('is_active', true).count('id as count').first(),
+      db.from('gym_members').where('gym_id', gymId).where('assigned_trainer_id', trainer.id).count('id as count').first(),
+      db.from('workout_plans').where('gym_id', gymId).where('trainer_id', trainer.id).where('is_active', true).count('id as count').first(),
+      db.from('diet_plans').where('gym_id', gymId).where('trainer_id', trainer.id).where('is_active', true).count('id as count').first(),
     ])
 
     return response.ok({
@@ -93,89 +73,70 @@ export default class TrainersController {
   }
 
   async invite({ request, response, gymId }: HttpContext) {
-    const payload = await request.validateUsing(createTrainerValidator)
+    const payload = await request.validateUsing(inviteTrainerValidator)
 
-    // Find existing user or create one
-    let user = payload.userId
-      ? await db.from('users').where('id', payload.userId).first()
-      : payload.phone
-        ? await db.from('users').where('phone', payload.phone).first()
-        : null
-
-    if (!user && payload.phone && payload.fullName) {
-      const [newUser] = await db.table('users').insert({
-        id: crypto.randomUUID(),
-        phone: payload.phone,
-        full_name: payload.fullName,
-        is_phone_verified: false,
-        created_at: new Date(),
-        updated_at: new Date(),
-      }).returning('*')
-      user = newUser
-    }
-
-    if (!user) return response.badRequest({ success: false, error: { code: 'USER_NOT_FOUND', message: 'Provide userId or phone+fullName to invite a trainer' } })
-
-    // Check if already a trainer at this gym
-    const existing = await db.from('user_gym_roles').where('user_id', user.id).where('gym_id', gymId).where('role', 'trainer').first()
+    const existing = await db.from('users').where('email', payload.email).first()
     if (existing) {
-      return response.conflict({ success: false, error: { code: 'ALREADY_TRAINER', message: 'User is already a trainer at this gym' } })
+      return response.conflict({ success: false, error: { code: 'EMAIL_EXISTS', message: 'A user with this email already exists' } })
     }
 
-    const role = await db.table('user_gym_roles').insert({
+    const [trainer] = await db.table('users').insert({
       id: crypto.randomUUID(),
-      user_id: user.id,
-      gym_id: gymId,
+      full_name: payload.fullName,
+      email: payload.email,
+      phone: payload.phone ?? null,
+      password_hash: await hash.make(payload.password),
       role: 'trainer',
+      gym_id: gymId,
+      is_email_verified: true,
       is_active: true,
       metadata: JSON.stringify({
         specializations: payload.specializations ?? [],
         experience: payload.experience ?? 0,
         bio: payload.bio ?? '',
-        branchIds: payload.branchIds ?? [],
       }),
       created_at: new Date(),
       updated_at: new Date(),
-    }).returning('*')
+    }).returning('id', 'full_name', 'email', 'phone', 'role', 'gym_id', 'metadata', 'created_at')
 
-    return response.created({ success: true, data: role[0] })
+    return response.created({ success: true, data: trainer })
   }
 
   async update({ params, request, response, gymId }: HttpContext) {
-    const payload = await request.validateUsing(updateTrainerValidator)
-
-    const trainer = await db.from('user_gym_roles').where('gym_id', gymId).where('role', 'trainer').where('id', params.id).first()
+    const trainer = await db.from('users').where('id', params.id).where('role', 'trainer').where('gym_id', gymId).first()
     if (!trainer) return response.notFound({ success: false, error: { code: 'NOT_FOUND', message: 'Trainer not found' } })
 
-    const currentMeta = trainer.metadata ?? {}
+    const payload = await request.validateUsing(updateTrainerValidator)
     const updates: Record<string, any> = { updated_at: new Date() }
 
+    if (payload.fullName !== undefined) updates.full_name = payload.fullName
     if (payload.isActive !== undefined) updates.is_active = payload.isActive
-    if (payload.specializations !== undefined || payload.experience !== undefined || payload.bio !== undefined || payload.branchIds !== undefined) {
+
+    if (payload.specializations !== undefined || payload.experience !== undefined || payload.bio !== undefined) {
+      const currentMeta = trainer.metadata ?? {}
       updates.metadata = JSON.stringify({
         ...currentMeta,
         ...(payload.specializations !== undefined && { specializations: payload.specializations }),
         ...(payload.experience !== undefined && { experience: payload.experience }),
         ...(payload.bio !== undefined && { bio: payload.bio }),
-        ...(payload.branchIds !== undefined && { branchIds: payload.branchIds }),
       })
     }
 
-    await db.from('user_gym_roles').where('id', params.id).update(updates)
-    const updated = await db.from('user_gym_roles').where('id', params.id).first()
+    await db.from('users').where('id', params.id).update(updates)
+    const updated = await db.from('users').where('id', params.id).first()
     return response.ok({ success: true, data: updated })
   }
 
   async remove({ params, response, gymId }: HttpContext) {
-    const trainer = await db.from('user_gym_roles').where('gym_id', gymId).where('role', 'trainer').where('id', params.id).first()
+    const trainer = await db.from('users').where('id', params.id).where('role', 'trainer').where('gym_id', gymId).first()
     if (!trainer) return response.notFound({ success: false, error: { code: 'NOT_FOUND', message: 'Trainer not found' } })
 
-    await db.from('user_gym_roles').where('id', params.id).update({ is_active: false, updated_at: new Date() })
+    await db.from('users').where('id', params.id).update({ is_active: false, updated_at: new Date() })
     return response.ok({ success: true, message: 'Trainer removed' })
   }
 
   async members({ params, request, response, gymId }: HttpContext) {
-    const trainer = await db.from('user_gym_roles').where('gym_id', gymId).where('role', 'trainer').where('id', params.id).first()
+    const trainer = await db.from('users').where('id', params.id).where('role', 'trainer').where('gym_id', gymId).first()
     if (!trainer) return response.notFound({ success: false, error: { code: 'NOT_FOUND', message: 'Trainer not found' } })
 
     const { page = 1, limit = 20 } = request.qs()
@@ -183,9 +144,9 @@ export default class TrainersController {
       .from('gym_members as gm')
       .join('users as u', 'u.id', 'gm.user_id')
       .where('gm.gym_id', gymId)
-      .where('gm.trainer_id', trainer.user_id)
+      .where('gm.assigned_trainer_id', trainer.id)
       .where('gm.status', 'active')
-      .select('gm.id', 'gm.member_code', 'gm.status', 'u.full_name', 'u.avatar_url', 'u.phone')
+      .select('gm.id', 'gm.member_code', 'gm.status', 'u.full_name', 'u.profile_photo_url', 'u.phone')
       .paginate(Number(page), Number(limit))
 
     return response.ok({ success: true, data: members })

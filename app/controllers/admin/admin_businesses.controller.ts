@@ -1,6 +1,8 @@
 import { DateTime } from 'luxon'
 import type { HttpContext } from '@adonisjs/core/http'
 import Business from '#models/business.model'
+import GymMember from '#models/gym_member.model'
+import db from '@adonisjs/lucid/services/db'
 import {
   createBusinessValidator,
   updateBusinessValidator,
@@ -147,6 +149,48 @@ export default class AdminBusinessesController {
     await business.save()
 
     return response.ok({ success: true, data: business.serialize() })
+  }
+
+  async members({ params, request, response }: HttpContext) {
+    const page = Number(request.qs().page ?? 1)
+    const search = request.qs().search as string | undefined
+    const status = request.qs().status as string | undefined
+
+    const business = await Business.query()
+      .where('id', params.id)
+      .whereNull('deleted_at')
+      .firstOrFail()
+
+    const gymRows = await db
+      .from('gyms')
+      .join('users', 'gyms.owner_id', 'users.id')
+      .where('users.business_id', business.id)
+      .whereNull('gyms.deleted_at')
+      .select('gyms.id')
+    const gymIds: string[] = gymRows.map((r: any) => r.id)
+
+    const query = GymMember.query()
+      .whereIn('gym_id', gymIds.length ? gymIds : ['__none__'])
+      .whereNull('deleted_at')
+      .preload('user')
+      .preload('gym')
+      .preload('activeSubscription', (q) => q.preload('membershipPlan'))
+
+    if (status) query.where('status', status)
+    if (search) {
+      query.whereHas('user', (q) => {
+        q.whereILike('full_name', `%${search}%`).orWhereILike('email', `%${search}%`)
+      })
+    }
+
+    const members = await query.orderBy('created_at', 'desc').paginate(page, 20)
+
+    return response.ok({
+      success: true,
+      data: members.all().map((m) => m.serialize()),
+      meta: members.getMeta(),
+      business: { id: business.id, name: business.name, slug: business.slug },
+    })
   }
 
   async destroy({ params, response }: HttpContext) {

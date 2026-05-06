@@ -7,7 +7,7 @@ export const createBusinessAdminValidator = vine.compile(
     email: vine.string().trim().email().normalizeEmail(),
     phone: vine.string().trim().regex(/^\+?[\d\s\-]{7,20}$/).optional(),
     password: vine.string().minLength(8),
-    role: vine.enum(['admin', 'manager', 'owner']).optional(),
+    role: vine.string().trim().optional(),
   })
 )
 
@@ -17,7 +17,7 @@ export const updateBusinessAdminValidator = vine.compile(
     email: vine.string().trim().email().normalizeEmail().optional(),
     phone: vine.string().trim().regex(/^\+?[\d\s\-]{7,20}$/).optional(),
     password: vine.string().minLength(8).optional(),
-    role: vine.enum(['admin', 'manager', 'owner']).optional(),
+    role: vine.string().trim().optional(),
     isActive: vine.boolean().optional(),
   })
 )

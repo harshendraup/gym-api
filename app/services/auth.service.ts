@@ -1,6 +1,5 @@
 import redis from '@adonisjs/redis/services/main'
 import User from '#models/user.model'
-import UserGymRole from '#models/user_gym_role.model'
 import { generateOtp, generateRefreshToken } from '#helpers/crypto.helper'
 import { OtpService } from './otp.service.js'
 import { DateTime } from 'luxon'
@@ -20,12 +19,9 @@ interface LoginResult {
 export class AuthService {
   private otpService = new OtpService()
 
-  // -------------------------------------------------------------------------
-  // OTP Flow
-  // -------------------------------------------------------------------------
-
   async requestOtp(phone: string): Promise<{ devOtp?: string }> {
-    const otp = generateOtp()
+    // const otp = generateOtp() // TODO: Enable real OTP generation and remove hardcoded OTP for development only
+    const otp = "123456" // TODO: Remove this hardcoded OTP for development only
     await this.otpService.storeOtp(phone, otp)
     const devOtp = await this.otpService.sendSms(phone, otp)
     return devOtp ? { devOtp } : {}
@@ -40,6 +36,7 @@ export class AuthService {
         phone,
         fullName: 'Member',
         isPhoneVerified: true,
+        role: 'member',
       })
     } else {
       user.isPhoneVerified = true
@@ -47,14 +44,10 @@ export class AuthService {
       await user.save()
     }
 
-    const gymContext = await this.resolveGymContext(user.id)
+    const gymContext = this.resolveGymContext(user)
     const tokens = await this.issueTokens(user, gymContext?.gymId)
     return { user, tokens, gymContext }
   }
-
-  // -------------------------------------------------------------------------
-  // Email + Password Flow
-  // -------------------------------------------------------------------------
 
   async loginWithPassword(email: string, password: string): Promise<LoginResult> {
     const user = await User.findBy('email', email)
@@ -70,14 +63,10 @@ export class AuthService {
     user.lastLoginAt = DateTime.now()
     await user.save()
 
-    const gymContext = await this.resolveGymContext(user.id)
+    const gymContext = this.resolveGymContext(user)
     const tokens = await this.issueTokens(user, gymContext?.gymId)
     return { user, tokens, gymContext }
   }
-
-  // -------------------------------------------------------------------------
-  // Token Management
-  // -------------------------------------------------------------------------
 
   async refreshTokens(refreshToken: string): Promise<TokenPair> {
     const key = `refresh_token:${refreshToken}`
@@ -88,7 +77,6 @@ export class AuthService {
     const payload = JSON.parse(stored) as { userId: string; gymId?: string }
     const user = await User.findOrFail(payload.userId)
 
-    // Rotate — invalidate old, issue new
     await redis.del(key)
     return this.issueTokens(user, payload.gymId)
   }
@@ -102,14 +90,21 @@ export class AuthService {
     if (keys.length) await redis.del(...keys)
   }
 
-  // -------------------------------------------------------------------------
-  // Helpers
-  // -------------------------------------------------------------------------
+  private resolveGymContext(user: User): { gymId: string | null; role: string } | null {
+    if (user.role === 'super_admin') {
+      return { gymId: null, role: 'super_admin' }
+    }
+
+    if (user.gymId) {
+      return { gymId: user.gymId, role: user.role }
+    }
+
+    return null
+  }
 
   private async issueTokens(user: User, gymId?: string): Promise<TokenPair> {
-    const expiresIn = 15 * 60 // 15 minutes in seconds
+    const expiresIn = 15 * 60
 
-    // Create DB-backed access token via @adonisjs/auth access_tokens provider
     const token = await User.accessTokens.create(user, ['*'], {
       expiresIn: '15m',
       name: gymId ? `gym:${gymId}` : 'default',
@@ -118,7 +113,6 @@ export class AuthService {
     const refreshToken = generateRefreshToken()
     const refreshPayload = JSON.stringify({ userId: user.id, gymId: gymId ?? null })
 
-    // 30 days TTL in Redis
     await redis.setex(`refresh_token:${refreshToken}`, 30 * 24 * 3600, refreshPayload)
 
     return {
@@ -126,31 +120,5 @@ export class AuthService {
       refreshToken,
       expiresIn,
     }
-  }
-
-  private async resolveGymContext(
-    userId: string
-  ): Promise<{ gymId: string; role: string } | null> {
-    const superAdmin = await UserGymRole.query()
-      .where('user_id', userId)
-      .where('role', 'super_admin')
-      .where('is_active', true)
-      .first()
-
-    if (superAdmin) {
-      return { gymId: superAdmin.gymId ?? '', role: 'super_admin' }
-    }
-
-    const roles = await UserGymRole.query()
-      .where('user_id', userId)
-      .where('is_active', true)
-      .whereNotNull('gym_id')
-      .limit(2)
-
-    if (roles.length === 1) {
-      return { gymId: roles[0].gymId, role: roles[0].role }
-    }
-
-    return null
   }
 }

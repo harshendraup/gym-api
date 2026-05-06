@@ -1,11 +1,11 @@
 import { DateTime } from 'luxon'
 import hash from '@adonisjs/core/services/hash'
-import { BaseModel, column, beforeSave, hasMany, manyToMany } from '@adonisjs/lucid/orm'
-import type { HasMany, ManyToMany } from '@adonisjs/lucid/types/relations'
+import { BaseModel, column, beforeSave, hasMany, belongsTo } from '@adonisjs/lucid/orm'
+import type { HasMany, BelongsTo } from '@adonisjs/lucid/types/relations'
 import { DbAccessTokensProvider } from '@adonisjs/auth/access_tokens'
-import UserGymRole from './user_gym_role.model.js'
 import GymMember from './gym_member.model.js'
 import DeviceToken from './device_token.model.js'
+import Business from './business.model.js'
 
 export default class User extends BaseModel {
   static accessTokens = DbAccessTokensProvider.forModel(User, {
@@ -19,6 +19,12 @@ export default class User extends BaseModel {
 
   @column()
   declare gymId: string | null
+
+  @column()
+  declare businessId: string | null
+
+  @column()
+  declare role: 'super_admin' | 'admin' | 'trainer' | 'member' | 'gym_owner'
 
   @column()
   declare phone: string | null
@@ -62,8 +68,8 @@ export default class User extends BaseModel {
   @column.dateTime({ autoCreate: true, autoUpdate: true })
   declare updatedAt: DateTime
 
-  @hasMany(() => UserGymRole)
-  declare gymRoles: HasMany<typeof UserGymRole>
+  @belongsTo(() => Business)
+  declare business: BelongsTo<typeof Business>
 
   @hasMany(() => GymMember)
   declare gymMemberships: HasMany<typeof GymMember>

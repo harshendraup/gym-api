@@ -3,8 +3,6 @@ import db from '@adonisjs/lucid/services/db'
 import hash from '@adonisjs/core/services/hash'
 import { DateTime } from 'luxon'
 
-// Lucid v21's InsertQueryBuilderContract doesn't expose onConflict in its types,
-// but catching pg unique_violation (23505) is equivalent and works universally.
 const upsert = async (table: string, data: object) => {
   try {
     await db.table(table).insert(data)
@@ -17,98 +15,33 @@ export default class MainSeeder extends BaseSeeder {
   async run() {
     const now = DateTime.now().toSQL()!
 
-    // ─── Super Admin ────────────────────────────────────────────────────────
-    const superAdminId = 'a0000000-0000-0000-0000-000000000001'
-    const passwordHash = await hash.make('SuperAdmin@123')
-
+    // ─── Super Admin ─────────────────────────────────────────────────────────
     await upsert('users', {
-      id: superAdminId,
+      id: 'a0000000-0000-0000-0000-000000000001',
       phone: '+919999999999',
       email: 'admin@gymos.in',
-      password_hash: passwordHash,
+      password_hash: await hash.make('SuperAdmin@123'),
       full_name: 'GymOS Super Admin',
+      role: 'super_admin',
       is_phone_verified: true,
       is_email_verified: true,
+      is_active: true,
       created_at: now,
       updated_at: now,
     })
 
-    const existingRole = await db.from('user_gym_roles').where('user_id', superAdminId).where('role', 'super_admin').first()
-    if (!existingRole) {
-      await db.table('user_gym_roles').insert({
-        id: 'b0000000-0000-0000-0000-000000000001',
-        user_id: superAdminId,
-        gym_id: null,
-        role: 'super_admin',
-        is_active: true,
-        created_at: now,
-        updated_at: now,
-      })
-    }
-
-    // ─── SaaS Plans ─────────────────────────────────────────────────────────
+    // ─── SaaS Plans ──────────────────────────────────────────────────────────
     const saasPlans = [
-      {
-        id: 'c0000000-0000-0000-0000-000000000001',
-        name: 'Starter',
-        slug: 'starter',
-        price_monthly: 999,
-        price_yearly: 9990,
-        max_members: 100,
-        max_branches: 1,
-        max_trainers: 2,
-        has_white_label: false,
-        has_analytics: false,
-        has_pt_management: false,
-        has_diet_management: false,
-        has_api_access: false,
-        storage_gb: 5,
-      },
-      {
-        id: 'c0000000-0000-0000-0000-000000000002',
-        name: 'Professional',
-        slug: 'professional',
-        price_monthly: 2499,
-        price_yearly: 24990,
-        max_members: 500,
-        max_branches: 3,
-        max_trainers: 10,
-        has_white_label: false,
-        has_analytics: true,
-        has_pt_management: true,
-        has_diet_management: true,
-        has_api_access: false,
-        storage_gb: 20,
-      },
-      {
-        id: 'c0000000-0000-0000-0000-000000000003',
-        name: 'Enterprise',
-        slug: 'enterprise',
-        price_monthly: 5999,
-        price_yearly: 59990,
-        max_members: -1,
-        max_branches: -1,
-        max_trainers: -1,
-        has_white_label: true,
-        has_analytics: true,
-        has_pt_management: true,
-        has_diet_management: true,
-        has_api_access: true,
-        storage_gb: 100,
-      },
+      { id: 'c0000000-0000-0000-0000-000000000001', name: 'Starter', slug: 'starter', price_monthly: 999, price_yearly: 9990, max_members: 100, max_branches: 1, max_trainers: 2, has_white_label: false, has_analytics: false, has_pt_management: false, has_diet_management: false, has_api_access: false, storage_gb: 5 },
+      { id: 'c0000000-0000-0000-0000-000000000002', name: 'Professional', slug: 'professional', price_monthly: 2499, price_yearly: 24990, max_members: 500, max_branches: 3, max_trainers: 10, has_white_label: false, has_analytics: true, has_pt_management: true, has_diet_management: true, has_api_access: false, storage_gb: 20 },
+      { id: 'c0000000-0000-0000-0000-000000000003', name: 'Enterprise', slug: 'enterprise', price_monthly: 5999, price_yearly: 59990, max_members: -1, max_branches: -1, max_trainers: -1, has_white_label: true, has_analytics: true, has_pt_management: true, has_diet_management: true, has_api_access: true, storage_gb: 100 },
     ]
 
     for (const plan of saasPlans) {
-      await upsert('saas_plans', {
-        ...plan,
-        is_active: true,
-        created_at: now,
-        updated_at: now,
-      })
+      await upsert('saas_plans', { ...plan, is_active: true, created_at: now, updated_at: now })
     }
 
-    // ─── Demo Gym ────────────────────────────────────────────────────────────
-    const gymOwnerPassword = await hash.make('GymOwner@123')
+    // ─── Demo Gym ─────────────────────────────────────────────────────────────
     const gymOwnerId = 'a0000000-0000-0000-0000-000000000002'
     const gymId = 'd0000000-0000-0000-0000-000000000001'
     const branchId = 'e0000000-0000-0000-0000-000000000001'
@@ -117,10 +50,12 @@ export default class MainSeeder extends BaseSeeder {
       id: gymOwnerId,
       phone: '+918888888888',
       email: 'owner@fitlife.in',
-      password_hash: gymOwnerPassword,
+      password_hash: await hash.make('GymOwner@123'),
       full_name: 'Rajesh Kumar',
+      role: 'gym_owner',
       is_phone_verified: true,
       is_email_verified: true,
+      is_active: true,
       created_at: now,
       updated_at: now,
     })
@@ -143,15 +78,7 @@ export default class MainSeeder extends BaseSeeder {
       primary_color: '#6366f1',
       secondary_color: '#8b5cf6',
       accent_color: '#a78bfa',
-      timings: JSON.stringify({
-        monday: { open: '05:30', close: '22:00' },
-        tuesday: { open: '05:30', close: '22:00' },
-        wednesday: { open: '05:30', close: '22:00' },
-        thursday: { open: '05:30', close: '22:00' },
-        friday: { open: '05:30', close: '22:00' },
-        saturday: { open: '06:00', close: '21:00' },
-        sunday: { open: '07:00', close: '20:00' },
-      }),
+      timings: JSON.stringify({ monday: { open: '05:30', close: '22:00' }, tuesday: { open: '05:30', close: '22:00' }, wednesday: { open: '05:30', close: '22:00' }, thursday: { open: '05:30', close: '22:00' }, friday: { open: '05:30', close: '22:00' }, saturday: { open: '06:00', close: '21:00' }, sunday: { open: '07:00', close: '20:00' } }),
       facilities: JSON.stringify(['cardio', 'weights', 'yoga', 'steam', 'locker']),
       created_at: now,
       updated_at: now,
@@ -173,7 +100,9 @@ export default class MainSeeder extends BaseSeeder {
       updated_at: now,
     })
 
-    // Gym subscription
+    // Link gym owner to gym after gym is created
+    await db.from('users').where('id', gymOwnerId).update({ gym_id: gymId, updated_at: now })
+
     await upsert('gym_subscriptions', {
       id: 'f0000000-0000-0000-0000-000000000001',
       gym_id: gymId,
@@ -186,18 +115,7 @@ export default class MainSeeder extends BaseSeeder {
       updated_at: now,
     })
 
-    // Gym owner role
-    await upsert('user_gym_roles', {
-      id: 'b0000000-0000-0000-0000-000000000002',
-      user_id: gymOwnerId,
-      gym_id: gymId,
-      role: 'gym_owner',
-      is_active: true,
-      created_at: now,
-      updated_at: now,
-    })
-
-    // ─── Membership Plans ────────────────────────────────────────────────────
+    // ─── Membership Plans ─────────────────────────────────────────────────────
     const membershipPlans = [
       { id: '10000000-0000-0000-0000-000000000001', name: 'Monthly Basic', duration_days: 30, price: 999, plan_type: 'standard', includes_pt: false, max_freeze_days: 0 },
       { id: '10000000-0000-0000-0000-000000000002', name: 'Quarterly', duration_days: 90, price: 2499, plan_type: 'standard', includes_pt: false, max_freeze_days: 7 },
@@ -206,52 +124,41 @@ export default class MainSeeder extends BaseSeeder {
     ]
 
     for (const plan of membershipPlans) {
-      await upsert('membership_plans', {
-        ...plan,
-        gym_id: gymId,
-        is_active: true,
-        created_at: now,
-        updated_at: now,
-      })
+      await upsert('membership_plans', { ...plan, gym_id: gymId, is_active: true, created_at: now, updated_at: now })
     }
 
-    // ─── Demo Trainer ────────────────────────────────────────────────────────
+    // ─── Demo Trainer ─────────────────────────────────────────────────────────
     const trainerId = 'a0000000-0000-0000-0000-000000000003'
-    const trainerPassword = await hash.make('Trainer@123')
 
     await upsert('users', {
       id: trainerId,
       phone: '+917777777777',
       email: 'trainer@fitlife.in',
-      password_hash: trainerPassword,
+      password_hash: await hash.make('Trainer@123'),
       full_name: 'Priya Sharma',
+      role: 'trainer',
+      gym_id: gymId,
       is_phone_verified: true,
       is_email_verified: true,
-      created_at: now,
-      updated_at: now,
-    })
-
-    await upsert('user_gym_roles', {
-      id: 'b0000000-0000-0000-0000-000000000003',
-      user_id: trainerId,
-      gym_id: gymId,
-      role: 'trainer',
       is_active: true,
       created_at: now,
       updated_at: now,
     })
 
-    // ─── Demo Member ─────────────────────────────────────────────────────────
+    // ─── Demo Member ──────────────────────────────────────────────────────────
     const memberId = 'a0000000-0000-0000-0000-000000000004'
-    const memberPassword = await hash.make('Member@123')
 
     await upsert('users', {
       id: memberId,
       phone: '+916666666666',
       email: 'member@example.com',
-      password_hash: memberPassword,
+      password_hash: await hash.make('Member@123'),
       full_name: 'Arjun Mehta',
+      role: 'member',
+      gym_id: gymId,
       is_phone_verified: true,
+      is_email_verified: true,
+      is_active: true,
       created_at: now,
       updated_at: now,
     })
@@ -271,18 +178,6 @@ export default class MainSeeder extends BaseSeeder {
       updated_at: now,
     })
 
-    await upsert('user_gym_roles', {
-      id: 'b0000000-0000-0000-0000-000000000004',
-      user_id: memberId,
-      gym_id: gymId,
-      role: 'member',
-      is_active: true,
-      created_at: now,
-      updated_at: now,
-    })
-
-    // Active subscription for demo member
-    const expiresAt = DateTime.now().plus({ days: 90 })
     await upsert('member_subscriptions', {
       id: '30000000-0000-0000-0000-000000000001',
       gym_id: gymId,
@@ -290,7 +185,7 @@ export default class MainSeeder extends BaseSeeder {
       membership_plan_id: '10000000-0000-0000-0000-000000000002',
       status: 'active',
       starts_at: DateTime.now().toSQLDate()!,
-      expires_at: expiresAt.toSQLDate()!,
+      expires_at: DateTime.now().plus({ days: 90 }).toSQLDate()!,
       amount_paid: 2499,
       payment_mode: 'cash',
       freeze_days_used: 0,
@@ -299,10 +194,10 @@ export default class MainSeeder extends BaseSeeder {
     })
 
     console.log('✅ Seed complete')
-    console.log('   Super Admin: +919999999999 / SuperAdmin@123')
-    console.log('   Gym Owner:   +918888888888 / GymOwner@123')
-    console.log('   Trainer:     +917777777777 / Trainer@123')
-    console.log('   Member:      +916666666666 / Member@123')
-    console.log('   Demo Gym ID:', gymId)
+    console.log('   Super Admin : admin@gymos.in     / SuperAdmin@123')
+    console.log('   Gym Owner   : owner@fitlife.in   / GymOwner@123')
+    console.log('   Trainer     : trainer@fitlife.in / Trainer@123')
+    console.log('   Member      : member@example.com / Member@123')
+    console.log('   Demo Gym ID :', gymId)
   }
 }

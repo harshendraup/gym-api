@@ -9,17 +9,18 @@ const createGymOwnerValidator = vine.compile(
     email: vine.string().email().trim(),
     password: vine.string().minLength(6),
     gymId: vine.string().uuid(),
+    businessId: vine.string().uuid().optional(),
   })
 )
 
 export default class AdminUsersController {
   async index({ request, response }: HttpContext) {
-    const { search, isVerified, page = 1, limit = 20 } = request.qs()
+    const { search, role, page = 1, limit = 20 } = request.qs()
 
     let query = db
       .from('users')
       .orderBy('created_at', 'desc')
-      .select('id', 'full_name', 'phone', 'email', 'is_phone_verified', 'is_email_verified', 'created_at', 'updated_at')
+      .select('id', 'full_name', 'phone', 'email', 'role', 'business_id', 'gym_id', 'is_active', 'created_at', 'updated_at')
 
     if (search) {
       query = query.where((q) => {
@@ -29,9 +30,7 @@ export default class AdminUsersController {
       })
     }
 
-    if (isVerified !== undefined) {
-      query = query.where('is_phone_verified', isVerified === 'true')
-    }
+    if (role) query = query.where('role', role)
 
     const users = await query.paginate(Number(page), Number(limit))
     return response.ok({ success: true, data: users })
@@ -41,30 +40,20 @@ export default class AdminUsersController {
     const user = await db
       .from('users')
       .where('id', params.id)
-      .select('id', 'full_name', 'phone', 'email', 'is_phone_verified', 'is_email_verified', 'avatar_url', 'created_at', 'updated_at')
+      .select('id', 'full_name', 'phone', 'email', 'role', 'business_id', 'gym_id', 'is_active', 'created_at', 'updated_at')
       .first()
 
     if (!user) return response.notFound({ success: false, error: { code: 'NOT_FOUND', message: 'User not found' } })
 
-    const gymRoles = await db
-      .from('user_gym_roles as ugr')
-      .join('gyms as g', 'g.id', 'ugr.gym_id')
-      .where('ugr.user_id', params.id)
-      .select('ugr.role', 'ugr.is_active', 'g.id as gym_id', 'g.name as gym_name', 'g.slug as gym_slug')
-
-    return response.ok({ success: true, data: { ...user, gymRoles } })
+    return response.ok({ success: true, data: user })
   }
 
   async suspend({ params, response }: HttpContext) {
     const user = await db.from('users').where('id', params.id).first()
     if (!user) return response.notFound({ success: false, error: { code: 'NOT_FOUND', message: 'User not found' } })
 
-    await db.from('users').where('id', params.id).update({
-      is_suspended: true,
-      updated_at: new Date(),
-    })
+    await db.from('users').where('id', params.id).update({ is_active: false, updated_at: new Date() })
 
-    // Revoke all sessions
     const { default: redis } = await import('@adonisjs/redis/services/main')
     await redis.del(`gymos:refresh:*:${params.id}`)
 
@@ -72,7 +61,7 @@ export default class AdminUsersController {
   }
 
   async unsuspend({ params, response }: HttpContext) {
-    await db.from('users').where('id', params.id).update({ is_suspended: false, updated_at: new Date() })
+    await db.from('users').where('id', params.id).update({ is_active: true, updated_at: new Date() })
     return response.ok({ success: true, message: 'User unsuspended' })
   }
 
@@ -80,17 +69,15 @@ export default class AdminUsersController {
     const { gymId, search, page = 1, limit = 20 } = request.qs()
 
     let query = db
-      .from('user_gym_roles as ugr')
-      .join('users as u', 'u.id', 'ugr.user_id')
-      .join('gyms as g', 'g.id', 'ugr.gym_id')
-      .where('ugr.role', 'gym_owner')
-      .select('ugr.id', 'ugr.gym_id', 'ugr.is_active', 'ugr.created_at', 'u.id as user_id', 'u.full_name', 'u.email', 'g.name as gym_name')
-      .orderBy('ugr.created_at', 'desc')
+      .from('users')
+      .where('role', 'gym_owner')
+      .select('id', 'full_name', 'email', 'gym_id', 'business_id', 'is_active', 'created_at')
+      .orderBy('created_at', 'desc')
 
-    if (gymId) query = query.where('ugr.gym_id', gymId)
+    if (gymId) query = query.where('gym_id', gymId)
     if (search) {
       query = query.where((q) => {
-        q.whereILike('u.full_name', `%${search}%`).orWhereILike('u.email', `%${search}%`)
+        q.whereILike('full_name', `%${search}%`).orWhereILike('email', `%${search}%`)
       })
     }
 
@@ -114,38 +101,30 @@ export default class AdminUsersController {
       full_name: payload.fullName,
       email: payload.email,
       password_hash: await hash.make(payload.password),
+      role: 'gym_owner',
+      gym_id: payload.gymId,
+      business_id: payload.businessId ?? null,
       is_email_verified: true,
       is_active: true,
       created_at: new Date(),
       updated_at: new Date(),
-    }).returning('id', 'full_name', 'email', 'created_at')
-
-    await db.table('user_gym_roles').insert({
-      id: crypto.randomUUID(),
-      user_id: user.id,
-      gym_id: payload.gymId,
-      role: 'gym_owner',
-      is_active: true,
-      permissions: JSON.stringify([]),
-      created_at: new Date(),
-      updated_at: new Date(),
-    })
+    }).returning('id', 'full_name', 'email', 'role', 'gym_id', 'created_at')
 
     return response.created({ success: true, data: { user, gymId: payload.gymId, gymName: gym.name } })
   }
 
   async removeGymOwner({ params, response }: HttpContext) {
-    const role = await db.from('user_gym_roles').where('id', params.id).where('role', 'gym_owner').first()
-    if (!role) return response.notFound({ success: false, error: { code: 'NOT_FOUND', message: 'Gym owner not found' } })
+    const user = await db.from('users').where('id', params.id).where('role', 'gym_owner').first()
+    if (!user) return response.notFound({ success: false, error: { code: 'NOT_FOUND', message: 'Gym owner not found' } })
 
-    await db.from('user_gym_roles').where('id', params.id).update({ is_active: false, updated_at: new Date() })
+    await db.from('users').where('id', params.id).update({ is_active: false, updated_at: new Date() })
     return response.ok({ success: true, message: 'Gym owner removed' })
   }
 
   async stats({ response }: HttpContext) {
-    const [total, verified, today] = await Promise.all([
+    const [total, active, today] = await Promise.all([
       db.from('users').count('id as count').first(),
-      db.from('users').where('is_phone_verified', true).count('id as count').first(),
+      db.from('users').where('is_active', true).count('id as count').first(),
       db.from('users').whereRaw('created_at::date = CURRENT_DATE').count('id as count').first(),
     ])
 
@@ -153,7 +132,7 @@ export default class AdminUsersController {
       success: true,
       data: {
         totalUsers: Number(total?.count ?? 0),
-        verifiedUsers: Number(verified?.count ?? 0),
+        activeUsers: Number(active?.count ?? 0),
         newToday: Number(today?.count ?? 0),
       },
     })

@@ -36,6 +36,7 @@ router
     router.put('/businesses/:id', [AdminBusinessesController, 'update']).as('admin.businesses.update')
     router.put('/businesses/:id/status', [AdminBusinessesController, 'updateStatus']).as('admin.businesses.status')
     router.delete('/businesses/:id', [AdminBusinessesController, 'destroy']).as('admin.businesses.destroy')
+    router.get('/businesses/:id/members', [AdminBusinessesController, 'members']).as('admin.businesses.members')
 
     // Business Admins
     router.get('/business-admins', [AdminBusinessAdminsController, 'index']).as('admin.businessAdmins.index')
