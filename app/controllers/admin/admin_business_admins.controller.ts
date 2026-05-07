@@ -65,6 +65,18 @@ export default class AdminBusinessAdminsController {
         },
       })
     }
+    if (payload.phone) {
+      const existingPhone = await User.findBy('phone', payload.phone)
+      if (existingPhone) {
+        return response.conflict({
+          success: false,
+          error: {
+            code: 'PHONE_EXISTS',
+            message: `A user with phone "${payload.phone}" already exists.`,
+          },
+        })
+      }
+    }
 
     const user = await User.create({
       businessId: payload.business_id,
@@ -96,6 +108,18 @@ export default class AdminBusinessAdminsController {
           error: {
             code: 'EMAIL_CONFLICT',
             message: `Email "${payload.email}" is already in use.`,
+          },
+        })
+      }
+    }
+    if (payload.phone && payload.phone !== user.phone) {
+      const conflict = await User.findBy('phone', payload.phone)
+      if (conflict) {
+        return response.conflict({
+          success: false,
+          error: {
+            code: 'PHONE_CONFLICT',
+            message: `Phone "${payload.phone}" is already in use.`,
           },
         })
       }

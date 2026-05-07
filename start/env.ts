@@ -41,6 +41,11 @@ export default await Env.create(new URL('../', import.meta.url), {
   S3_ACCESS_KEY: Env.schema.string.optional(),
   S3_SECRET_KEY: Env.schema.string.optional(),
   S3_PUBLIC_URL: Env.schema.string.optional(),
+  AWS_REGION: Env.schema.string.optional(),
+  AWS_ACCESS_KEY_ID: Env.schema.string.optional(),
+  AWS_SECRET_ACCESS_KEY: Env.schema.string.optional(),
+  AWS_S3_BUCKET: Env.schema.string.optional(),
+  AWS_S3_PUBLIC_BASE_URL: Env.schema.string.optional(),
 
   RESEND_API_KEY: Env.schema.string.optional(),
   MAIL_FROM_ADDRESS: Env.schema.string.optional(),
