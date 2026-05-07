@@ -24,7 +24,7 @@ export default class User extends BaseModel {
   declare businessId: string | null
 
   @column()
-  declare role: 'super_admin' | 'admin' | 'trainer' | 'member' | 'gym_owner'
+  declare role: 'super_admin' | 'admin' | 'manager' | 'trainer' | 'member' | 'gym_owner'
 
   @column()
   declare phone: string | null

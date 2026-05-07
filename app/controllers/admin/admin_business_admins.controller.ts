@@ -3,27 +3,27 @@ import User from '#models/user.model'
 import Business from '#models/business.model'
 import {
   createBusinessAdminValidator,
+  listBusinessAdminValidator,
   updateBusinessAdminValidator,
 } from '#validators/business_admin.validator'
 
 export default class AdminBusinessAdminsController {
   async index({ request, response }: HttpContext) {
-    const page = Number(request.qs().page ?? 1)
-    const businessId = request.qs().business_id as string | undefined
-    const search = request.qs().search as string | undefined
-    const role = request.qs().role as string | undefined
+    const payload = await request.validateUsing(listBusinessAdminValidator)
+    const page = payload.page ?? 1
+    const perPage = payload.perPage ?? 20
 
     const query = User.query().whereIn('role', ['admin', 'manager', 'gym_owner', 'trainer'])
 
-    if (businessId) query.where('business_id', businessId)
-    if (role) query.where('role', role)
-    if (search) {
+    if (payload.business_id) query.where('business_id', payload.business_id)
+    if (payload.role) query.where('role', payload.role)
+    if (payload.search) {
       query.where((q) => {
-        q.whereILike('full_name', `%${search}%`).orWhereILike('email', `%${search}%`)
+        q.whereILike('full_name', `%${payload.search}%`).orWhereILike('email', `%${payload.search}%`)
       })
     }
 
-    const admins = await query.orderBy('created_at', 'desc').paginate(page, 20)
+    const admins = await query.orderBy('created_at', 'desc').paginate(page, perPage)
 
     return response.ok({
       success: true,
@@ -44,7 +44,16 @@ export default class AdminBusinessAdminsController {
   async store({ request, response }: HttpContext) {
     const payload = await request.validateUsing(createBusinessAdminValidator)
 
-    await Business.query().where('id', payload.business_id).whereNull('deleted_at').firstOrFail()
+    const business = await Business.query().where('id', payload.business_id).whereNull('deleted_at').first()
+    if (!business) {
+      return response.notFound({
+        success: false,
+        error: {
+          code: 'BUSINESS_NOT_FOUND',
+          message: 'Business not found',
+        },
+      })
+    }
 
     const existing = await User.findBy('email', payload.email)
     if (existing) {
@@ -63,7 +72,7 @@ export default class AdminBusinessAdminsController {
       email: payload.email,
       phone: payload.phone ?? null,
       passwordHash: payload.password,
-      role: (payload.role as User['role']) ?? 'admin',
+      role: payload.role ?? 'admin',
       isEmailVerified: true,
       isActive: true,
     })
@@ -95,7 +104,7 @@ export default class AdminBusinessAdminsController {
     if (payload.name !== undefined) user.fullName = payload.name
     if (payload.email !== undefined) user.email = payload.email
     if (payload.phone !== undefined) user.phone = payload.phone ?? null
-    if (payload.role !== undefined) user.role = payload.role as User['role']
+    if (payload.role !== undefined) user.role = payload.role
     if (payload.isActive !== undefined) user.isActive = payload.isActive
     if (payload.password !== undefined) user.passwordHash = payload.password
 
