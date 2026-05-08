@@ -8,14 +8,21 @@ import {
 } from '#validators/business_admin.validator'
 
 export default class AdminBusinessAdminsController {
-  async index({ request, response }: HttpContext) {
+  private resolveBusinessScope(actor: User, requestedBusinessId?: string) {
+    if (actor.role === 'super_admin') return requestedBusinessId
+    return actor.businessId ?? requestedBusinessId
+  }
+
+  async index({ request, response, auth }: HttpContext) {
+    const actor = auth.getUserOrFail()
     const payload = await request.validateUsing(listBusinessAdminValidator)
     const page = payload.page ?? 1
     const perPage = payload.perPage ?? 20
 
-    const query = User.query().whereIn('role', ['admin', 'manager', 'gym_owner', 'trainer'])
+    const query = User.query()
 
-    if (payload.business_id) query.where('business_id', payload.business_id)
+    const businessScope = this.resolveBusinessScope(actor, payload.business_id)
+    if (businessScope) query.where('business_id', businessScope)
     if (payload.role) query.where('role', payload.role)
     if (payload.search) {
       query.where((q) => {
@@ -32,19 +39,46 @@ export default class AdminBusinessAdminsController {
     })
   }
 
-  async show({ params, response }: HttpContext) {
-    const admin = await User.query()
-      .where('id', params.id)
-      .whereIn('role', ['admin', 'manager', 'gym_owner', 'trainer'])
-      .firstOrFail()
+  async show({ params, response, auth }: HttpContext) {
+    const actor = auth.getUserOrFail()
+    const query = User.query().where('id', params.id)
+    if (actor.role !== 'super_admin') {
+      if (!actor.businessId) {
+        return response.forbidden({
+          success: false,
+          error: { code: 'BUSINESS_SCOPE_REQUIRED', message: 'User is not mapped to any business' },
+        })
+      }
+      query.where('business_id', actor.businessId)
+    }
+    const admin = await query.firstOrFail()
 
     return response.ok({ success: true, data: admin.serialize() })
   }
 
-  async store({ request, response }: HttpContext) {
+  async store({ request, response, auth }: HttpContext) {
+    const actor = auth.getUserOrFail()
     const payload = await request.validateUsing(createBusinessAdminValidator)
+    const businessId = this.resolveBusinessScope(actor, payload.business_id)
 
-    const business = await Business.query().where('id', payload.business_id).whereNull('deleted_at').first()
+    if (!businessId) {
+      return response.forbidden({
+        success: false,
+        error: { code: 'BUSINESS_SCOPE_REQUIRED', message: 'User is not mapped to any business' },
+      })
+    }
+
+    if (actor.role !== 'super_admin' && businessId !== actor.businessId) {
+      return response.forbidden({
+        success: false,
+        error: {
+          code: 'BUSINESS_ACCESS_DENIED',
+          message: 'You can only create users in your own business',
+        },
+      })
+    }
+
+    const business = await Business.query().where('id', businessId).whereNull('deleted_at').first()
     if (!business) {
       return response.notFound({
         success: false,
@@ -79,7 +113,7 @@ export default class AdminBusinessAdminsController {
     }
 
     const user = await User.create({
-      businessId: payload.business_id,
+      businessId,
       fullName: payload.name,
       email: payload.email,
       phone: payload.phone ?? null,
@@ -92,11 +126,19 @@ export default class AdminBusinessAdminsController {
     return response.created({ success: true, data: user.serialize() })
   }
 
-  async update({ params, request, response }: HttpContext) {
-    const user = await User.query()
-      .where('id', params.id)
-      .whereIn('role', ['admin', 'manager', 'gym_owner', 'trainer'])
-      .firstOrFail()
+  async update({ params, request, response, auth }: HttpContext) {
+    const actor = auth.getUserOrFail()
+    const userQuery = User.query().where('id', params.id)
+    if (actor.role !== 'super_admin') {
+      if (!actor.businessId) {
+        return response.forbidden({
+          success: false,
+          error: { code: 'BUSINESS_SCOPE_REQUIRED', message: 'User is not mapped to any business' },
+        })
+      }
+      userQuery.where('business_id', actor.businessId)
+    }
+    const user = await userQuery.firstOrFail()
 
     const payload = await request.validateUsing(updateBusinessAdminValidator)
 
@@ -137,11 +179,19 @@ export default class AdminBusinessAdminsController {
     return response.ok({ success: true, data: user.serialize() })
   }
 
-  async destroy({ params, response }: HttpContext) {
-    const user = await User.query()
-      .where('id', params.id)
-      .whereIn('role', ['admin', 'manager', 'gym_owner', 'trainer'])
-      .firstOrFail()
+  async destroy({ params, response, auth }: HttpContext) {
+    const actor = auth.getUserOrFail()
+    const userQuery = User.query().where('id', params.id)
+    if (actor.role !== 'super_admin') {
+      if (!actor.businessId) {
+        return response.forbidden({
+          success: false,
+          error: { code: 'BUSINESS_SCOPE_REQUIRED', message: 'User is not mapped to any business' },
+        })
+      }
+      userQuery.where('business_id', actor.businessId)
+    }
+    const user = await userQuery.firstOrFail()
 
     user.isActive = false
     await user.save()

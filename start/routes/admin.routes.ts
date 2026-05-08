@@ -10,6 +10,18 @@ const MetaController = () => import('#controllers/meta/meta.controller')
 
 router
   .group(() => {
+    router.get('/businesses/:id/overview', [AdminBusinessesController, 'overview']).as('admin.businesses.overview')
+    router.get('/business-admins', [AdminBusinessAdminsController, 'index']).as('admin.businessAdmins.index')
+    router.post('/business-admins', [AdminBusinessAdminsController, 'store']).as('admin.businessAdmins.store')
+    router.get('/business-admins/:id', [AdminBusinessAdminsController, 'show']).as('admin.businessAdmins.show')
+    router.put('/business-admins/:id', [AdminBusinessAdminsController, 'update']).as('admin.businessAdmins.update')
+    router.delete('/business-admins/:id', [AdminBusinessAdminsController, 'destroy']).as('admin.businessAdmins.destroy')
+  })
+  .prefix('/api/v1/admin')
+  .use([middleware.auth(), middleware.rbac(['super_admin', 'admin', 'manager'])])
+
+router
+  .group(() => {
     router.get('/gyms', [AdminGymsController, 'index']).as('admin.gyms.index')
     router.post('/gyms', [AdminGymsController, 'store']).as('admin.gyms.store')
     router.get('/gyms/:id', [AdminGymsController, 'show']).as('admin.gyms.show')
@@ -37,13 +49,6 @@ router
     router.put('/businesses/:id/status', [AdminBusinessesController, 'updateStatus']).as('admin.businesses.status')
     router.delete('/businesses/:id', [AdminBusinessesController, 'destroy']).as('admin.businesses.destroy')
     router.get('/businesses/:id/members', [AdminBusinessesController, 'members']).as('admin.businesses.members')
-
-    // Business Admins
-    router.get('/business-admins', [AdminBusinessAdminsController, 'index']).as('admin.businessAdmins.index')
-    router.post('/business-admins', [AdminBusinessAdminsController, 'store']).as('admin.businessAdmins.store')
-    router.get('/business-admins/:id', [AdminBusinessAdminsController, 'show']).as('admin.businessAdmins.show')
-    router.put('/business-admins/:id', [AdminBusinessAdminsController, 'update']).as('admin.businessAdmins.update')
-    router.delete('/business-admins/:id', [AdminBusinessAdminsController, 'destroy']).as('admin.businessAdmins.destroy')
 
     // App config — create / update / fetch per gym (busts meta cache on change)
     router.get('/gyms/:gymId/app-config', [MetaController, 'getConfig']).as('admin.gyms.appConfig.show')

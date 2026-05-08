@@ -1,7 +1,7 @@
 import type { HttpContext } from '@adonisjs/core/http'
 import type { NextFn } from '@adonisjs/core/types/http'
 
-export type GymRole = 'super_admin' | 'admin' | 'gym_owner' | 'trainer' | 'staff' | 'member'
+export type GymRole = 'super_admin' | 'admin' | 'manager' | 'gym_owner' | 'trainer' | 'staff' | 'member'
 
 declare module '@adonisjs/core/http' {
   interface HttpContext {
