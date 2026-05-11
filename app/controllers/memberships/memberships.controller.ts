@@ -3,23 +3,8 @@ import { MembershipService } from '#services/membership.service'
 import MemberSubscription from '#models/member_subscription.model'
 import MembershipPlan from '#models/membership_plan.model'
 import { createMembershipSubscriptionValidator } from '#validators/payment.validator'
+import { createMembershipPlanValidator, updateMembershipPlanValidator } from '#validators/membership_plan.validator'
 import vine from '@vinejs/vine'
-
-const createPlanValidator = vine.compile(
-  vine.object({
-    name: vine.string().trim().minLength(2).maxLength(100),
-    description: vine.string().trim().optional(),
-    durationDays: vine.number().min(1).max(3650),
-    price: vine.number().min(100),
-    discountPrice: vine.number().min(0).optional(),
-    planType: vine.enum(['standard', 'premium', 'student', 'couple', 'corporate']).optional(),
-    includesPt: vine.boolean().optional(),
-    ptSessionsCount: vine.number().min(0).optional(),
-    includesDiet: vine.boolean().optional(),
-    maxFreezeDays: vine.number().min(0).optional(),
-    inclusions: vine.array(vine.string()).optional(),
-  })
-)
 
 const freezeValidator = vine.compile(
   vine.object({
@@ -34,7 +19,6 @@ export default class MembershipsController {
   async listPlans({ response, gymId }: HttpContext) {
     const plans = await MembershipPlan.query()
       .where('gym_id', gymId)
-      .where('is_active', true)
       .whereNull('deleted_at')
       .orderBy('sort_order', 'asc')
       .orderBy('price', 'asc')
@@ -42,8 +26,18 @@ export default class MembershipsController {
     return response.ok({ success: true, data: plans.map((p) => p.serialize()) })
   }
 
+  async showPlan({ params, response, gymId }: HttpContext) {
+    const plan = await MembershipPlan.query()
+      .where('id', params.id)
+      .where('gym_id', gymId)
+      .whereNull('deleted_at')
+      .firstOrFail()
+
+    return response.ok({ success: true, data: plan.serialize() })
+  }
+
   async createPlan({ request, response, gymId }: HttpContext) {
-    const payload = await request.validateUsing(createPlanValidator)
+    const payload = await request.validateUsing(createMembershipPlanValidator)
     const plan = await MembershipPlan.create({ gymId, ...payload })
     return response.created({ success: true, data: plan.serialize() })
   }
@@ -55,7 +49,7 @@ export default class MembershipsController {
       .whereNull('deleted_at')
       .firstOrFail()
 
-    const payload = await request.validateUsing(createPlanValidator)
+    const payload = await request.validateUsing(updateMembershipPlanValidator)
     plan.merge(payload)
     await plan.save()
     return response.ok({ success: true, data: plan.serialize() })

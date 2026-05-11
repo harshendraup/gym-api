@@ -49,9 +49,10 @@ router
     router
       .group(() => {
         router.get('/plans', [MembershipsController, 'listPlans']).as('memberships.plans')
-        router.post('/plans', [MembershipsController, 'createPlan']).as('memberships.createPlan').use(middleware.rbac(['gym_owner']))
-        router.put('/plans/:id', [MembershipsController, 'updatePlan']).as('memberships.updatePlan').use(middleware.rbac(['gym_owner']))
-        router.delete('/plans/:id', [MembershipsController, 'deletePlan']).as('memberships.deletePlan').use(middleware.rbac(['gym_owner']))
+        router.get('/plans/:id', [MembershipsController, 'showPlan']).as('memberships.showPlan')
+        router.post('/plans', [MembershipsController, 'createPlan']).as('memberships.createPlan').use(middleware.rbac(['gym_owner', 'staff']))
+        router.put('/plans/:id', [MembershipsController, 'updatePlan']).as('memberships.updatePlan').use(middleware.rbac(['gym_owner', 'staff']))
+        router.delete('/plans/:id', [MembershipsController, 'deletePlan']).as('memberships.deletePlan').use(middleware.rbac(['gym_owner', 'staff']))
         router.post('/subscribe', [MembershipsController, 'subscribe']).as('memberships.subscribe')
         router.post('/:id/freeze', [MembershipsController, 'freeze']).as('memberships.freeze')
         router.post('/:id/unfreeze', [MembershipsController, 'unfreeze']).as('memberships.unfreeze')

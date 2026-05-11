@@ -7,11 +7,20 @@ export default class MembershipPlan extends BaseModel {
   static table = 'membership_plans'
 
   @column({ isPrimary: true }) declare id: string
-  @column() declare gymId: string
+  @column() declare gymId: string | null
+  @column() declare businessId: string | null
   @column() declare name: string
   @column() declare description: string | null
   @column() declare durationDays: number
   @column() declare price: number
+  @column() declare currency: string
+  @column() declare billingCycle: 'monthly' | 'quarterly' | 'yearly'
+  @column() declare enrollmentFee: number
+  @column() declare trialDays: number
+  @column() declare taxEnabled: boolean
+  @column() declare taxRate: number | null
+  @column() declare taxInclusive: boolean
+  @column() declare visibility: 'public' | 'private'
   @column() declare discountPrice: number | null
   @column() declare isOfferActive: boolean
   @column.dateTime() declare offerExpiresAt: DateTime | null
