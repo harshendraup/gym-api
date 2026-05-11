@@ -4,7 +4,7 @@ import { createMembershipPlanValidator, updateMembershipPlanValidator } from '#v
 
 export default class BusinessMembershipsController {
   private async ensureBusinessAccess(ctx: HttpContext): Promise<{ businessId: string }> {
-    const actor = ctx.auth.getUserOrFail()
+    const actor = ctx.auth.getUserOrFail() as any
     const businessId = ctx.params.businessId as string
 
     if (!actor.businessId) {
@@ -52,8 +52,9 @@ export default class BusinessMembershipsController {
     const { businessId } = await this.ensureBusinessAccess(ctx)
 
     const payload = await ctx.request.validateUsing(createMembershipPlanValidator)
+    const { gymId: _ignoreGymId, ...safePayload } = payload as any
 
-    const plan = await MembershipPlan.create({ businessId, gymId: null, ...payload })
+    const plan = await MembershipPlan.create({ ...safePayload, businessId, gymId: null })
     return ctx.response.created({ success: true, data: plan.serialize() })
   }
 

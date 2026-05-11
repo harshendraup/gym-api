@@ -4,6 +4,7 @@ import { middleware } from '#start/kernel'
 const BusinessUsersController = () => import('#controllers/business/business_users.controller')
 const BusinessProfileController = () => import('#controllers/business/business_profile.controller')
 const BusinessMembershipsController = () => import('#controllers/business/business_memberships.controller')
+const BusinessWorkoutsController = () => import('#controllers/business/business_workouts.controller')
 
 router
   .group(() => {
@@ -15,6 +16,16 @@ router
     router.post('/businesses/:businessId/memberships/plans', [BusinessMembershipsController, 'createPlan']).as('business.memberships.createPlan')
     router.put('/businesses/:businessId/memberships/plans/:id', [BusinessMembershipsController, 'updatePlan']).as('business.memberships.updatePlan')
     router.delete('/businesses/:businessId/memberships/plans/:id', [BusinessMembershipsController, 'deletePlan']).as('business.memberships.deletePlan')
+    router.get('/businesses/:businessId/workout-models', [BusinessWorkoutsController, 'listModels']).as('business.workouts.models.index')
+    router.post('/businesses/:businessId/workout-models', [BusinessWorkoutsController, 'createModel']).as('business.workouts.models.create')
+    router.get('/businesses/:businessId/workout-models/:id', [BusinessWorkoutsController, 'getModel']).as('business.workouts.models.show')
+    router.put('/businesses/:businessId/workout-models/:id', [BusinessWorkoutsController, 'updateModel']).as('business.workouts.models.update')
+    router.delete('/businesses/:businessId/workout-models/:id', [BusinessWorkoutsController, 'deleteModel']).as('business.workouts.models.delete')
+    router.post('/businesses/:businessId/workout-models/:id/assign', [BusinessWorkoutsController, 'assignModel']).as('business.workouts.assign')
+    router.get('/businesses/:businessId/workout-assignments', [BusinessWorkoutsController, 'listAssignments']).as('business.workouts.assignments.index')
+    router.post('/businesses/:businessId/workout-sessions/:assignmentId/log', [BusinessWorkoutsController, 'logSession']).as('business.workouts.sessions.log')
+    router.get('/businesses/:businessId/exercise-library', [BusinessWorkoutsController, 'listExercises']).as('business.workouts.exercises.index')
+    router.post('/businesses/:businessId/exercise-library', [BusinessWorkoutsController, 'createExercise']).as('business.workouts.exercises.create')
     router.get('/users', [BusinessUsersController, 'index']).as('business.users.index')
     router.post('/users', [BusinessUsersController, 'store']).as('business.users.store')
     router.put('/users/:id', [BusinessUsersController, 'update']).as('business.users.update')
