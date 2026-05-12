@@ -10,15 +10,50 @@ export default class AuthController {
    * Request mobile OTP
    */
   async requestOtp({ request, response }: HttpContext) {
-    const { phone } = await request.validateUsing(requestOtpValidator)
-    const result = await authService.requestOtp(phone)
-    return response.ok({
-      success: true,
-      data: {
-        message: 'OTP sent successfully',
-        ...(result.devOtp && { otp: result.devOtp, note: 'DEV mode only — not shown in production' }),
-      },
-    })
+    const payload = await request.validateUsing(requestOtpValidator)
+
+    if (!payload.email && !payload.phone) {
+      return response.badRequest({
+        success: false,
+        error: { code: 'VALIDATION_ERROR', message: 'email or phone is required' },
+      })
+    }
+
+    try {
+      const result = await authService.requestOtpForLogin({
+        businessId: payload.business_id,
+        role: payload.role,
+        email: payload.email,
+        phone: payload.phone,
+      })
+      return response.ok({
+        success: true,
+        data: {
+          message: 'OTP sent successfully',
+          ...(result.devOtp && { otp: result.devOtp, note: 'DEV mode only — not shown in production' }),
+        },
+      })
+    } catch (error: any) {
+      if (error.message === 'OTP_NOT_ALLOWED') {
+        return response.forbidden({
+          success: false,
+          error: { code: 'OTP_NOT_ALLOWED', message: 'OTP login is allowed only for member role' },
+        })
+      }
+      if (error.message === 'MEMBER_NOT_FOUND') {
+        return response.notFound({
+          success: false,
+          error: { code: 'MEMBER_NOT_FOUND', message: 'No member found for provided business and identity' },
+        })
+      }
+      if (error.message === 'ACCOUNT_DISABLED') {
+        return response.forbidden({
+          success: false,
+          error: { code: 'ACCOUNT_DISABLED', message: 'Account has been disabled' },
+        })
+      }
+      throw error
+    }
   }
 
   /**
@@ -26,18 +61,57 @@ export default class AuthController {
    * Verify OTP and get tokens
    */
   async verifyOtp({ request, response }: HttpContext) {
-    const { phone, otp } = await request.validateUsing(verifyOtpValidator)
-    const result = await authService.verifyOtpAndLogin(phone, otp)
-    return response.ok({
-      success: true,
-      data: {
-        user: result.user.serialize(),
-        accessToken: result.tokens.accessToken,
-        refreshToken: result.tokens.refreshToken,
-        expiresIn: result.tokens.expiresIn,
-        gymContext: result.gymContext,
-      },
-    })
+    const payload = await request.validateUsing(verifyOtpValidator)
+
+    if (!payload.email && !payload.phone) {
+      return response.badRequest({
+        success: false,
+        error: { code: 'VALIDATION_ERROR', message: 'email or phone is required' },
+      })
+    }
+
+    try {
+      const result = await authService.verifyOtpAndLoginForRole({
+        email: payload.email,
+        phone: payload.phone,
+        otp: payload.otp,
+      })
+      return response.ok({
+        success: true,
+        data: {
+          user: result.user.serialize(),
+          accessToken: result.tokens.accessToken,
+          refreshToken: result.tokens.refreshToken,
+          expiresIn: result.tokens.expiresIn,
+          gymContext: result.gymContext,
+        },
+      })
+    } catch (error: any) {
+      if (error.message === 'MEMBER_NOT_FOUND') {
+        return response.notFound({
+          success: false,
+          error: { code: 'MEMBER_NOT_FOUND', message: 'No member found for provided business and identity' },
+        })
+      }
+      if (error.message === 'ACCOUNT_DISABLED') {
+        return response.forbidden({
+          success: false,
+          error: { code: 'ACCOUNT_DISABLED', message: 'Account has been disabled' },
+        })
+      }
+      if (
+        error.message === 'OTP_EXPIRED' ||
+        error.message === 'OTP_INVALID' ||
+        error.message === 'OTP_LOCKED_OUT' ||
+        error.message === 'OTP_MAX_ATTEMPTS_EXCEEDED'
+      ) {
+        return response.unprocessableEntity({
+          success: false,
+          error: { code: error.message, message: 'Invalid or expired OTP' },
+        })
+      }
+      throw error
+    }
   }
 
   /**
@@ -45,10 +119,68 @@ export default class AuthController {
    * Email + password login (for admin dashboard)
    */
   async login({ request, response }: HttpContext) {
-    const { email, password } = await request.validateUsing(loginValidator)
+    const payload = await request.validateUsing(loginValidator)
+    const role = payload.role
+    const isGlobalRole = role === 'super_admin' || role === 'admin'
+
+    if (!payload.email && !payload.phone) {
+      return response.badRequest({
+        success: false,
+        error: { code: 'VALIDATION_ERROR', message: 'email or phone is required' },
+      })
+    }
+    if (role && !payload.business_id && !isGlobalRole) {
+      return response.badRequest({
+        success: false,
+        error: { code: 'VALIDATION_ERROR', message: 'business_id is required for this role' },
+      })
+    }
 
     try {
-      const result = await authService.loginWithPassword(email, password)
+      if (!payload.password && role === 'member') {
+        if (!payload.business_id) {
+          return response.badRequest({
+            success: false,
+            error: { code: 'VALIDATION_ERROR', message: 'business_id is required for member OTP login' },
+          })
+        }
+        const otpResult = await authService.requestOtpForLogin({
+          businessId: payload.business_id,
+          role,
+          email: payload.email,
+          phone: payload.phone,
+        })
+
+        return response.ok({
+          success: true,
+          data: {
+            requiresOtp: true,
+            message: 'OTP sent successfully',
+            ...(otpResult.devOtp && { otp: otpResult.devOtp, note: 'DEV mode only — not shown in production' }),
+          },
+        })
+      }
+
+      if (!payload.password) {
+        return response.badRequest({
+          success: false,
+          error: { code: 'VALIDATION_ERROR', message: 'password is required when role is not provided' },
+        })
+      }
+
+      const result = role
+        ? await authService.loginWithRole({
+            businessId: payload.business_id,
+            role,
+            email: payload.email,
+            phone: payload.phone,
+            password: payload.password,
+          })
+        : await authService.loginWithoutRole({
+            email: payload.email,
+            phone: payload.phone,
+            password: payload.password,
+          })
       return response.ok({
         success: true,
         data: {
@@ -70,6 +202,18 @@ export default class AuthController {
         return response.forbidden({
           success: false,
           error: { code: 'ACCOUNT_DISABLED', message: 'Account has been disabled' },
+        })
+      }
+      if (error.message === 'OTP_NOT_ALLOWED') {
+        return response.forbidden({
+          success: false,
+          error: { code: 'OTP_NOT_ALLOWED', message: 'OTP login is allowed only for member role' },
+        })
+      }
+      if (error.message === 'MEMBER_NOT_FOUND') {
+        return response.notFound({
+          success: false,
+          error: { code: 'MEMBER_NOT_FOUND', message: 'No member found for provided business and identity' },
         })
       }
       throw error

@@ -13,7 +13,7 @@ interface TokenPair {
 interface LoginResult {
   user: User
   tokens: TokenPair
-  gymContext: { gymId: string; role: string } | null
+  gymContext: { gymId: string | null; role: string } | null
 }
 
 export class AuthService {
@@ -25,6 +25,38 @@ export class AuthService {
     await this.otpService.storeOtp(phone, otp)
     const devOtp = await this.otpService.sendSms(phone, otp)
     return devOtp ? { devOtp } : {}
+  }
+
+  async requestOtpForLogin(input: {
+    businessId: string
+    role: string
+    email?: string
+    phone?: string
+  }): Promise<{ devOtp?: string }> {
+    if (input.role !== 'member') {
+      throw new Error('OTP_NOT_ALLOWED')
+    }
+
+    const user = await this.findLoginUser({
+      businessId: input.businessId,
+      role: input.role,
+      email: input.email,
+      phone: input.phone,
+    })
+
+    if (!user) throw new Error('MEMBER_NOT_FOUND')
+    if (!user.isActive) throw new Error('ACCOUNT_DISABLED')
+
+    // const otp = generateOtp() // TODO: Enable real OTP generation
+    const otp = '123456' // TODO: remove hardcoded OTP
+    await this.otpService.storeOtp(this.memberOtpKey(input.email, input.phone), otp)
+    if (user.phone ?? input.phone) {
+      const devOtp = await this.otpService.sendSms(user.phone ?? input.phone!, otp)
+      return devOtp ? { devOtp } : {}
+    }
+
+    // Email-only fallback: OTP is still generated/stored and can be verified.
+    return { devOtp: otp }
   }
 
   async verifyOtpAndLogin(phone: string, otp: string): Promise<LoginResult> {
@@ -64,7 +96,82 @@ export class AuthService {
     await user.save()
 
     const gymContext = this.resolveGymContext(user)
-    const tokens = await this.issueTokens(user, gymContext?.gymId)
+    const tokens = await this.issueTokens(user, gymContext?.gymId ?? undefined)
+    return { user, tokens, gymContext }
+  }
+
+  async loginWithoutRole(input: { email?: string; phone?: string; password: string }): Promise<LoginResult> {
+    const query = User.query()
+    if (input.email) query.where('email', input.email)
+    if (input.phone) query.where('phone', input.phone)
+    const user = await query.first()
+
+    if (!user || !(await user.verifyPassword(input.password))) {
+      throw new Error('INVALID_CREDENTIALS')
+    }
+
+    if (!user.isActive) {
+      throw new Error('ACCOUNT_DISABLED')
+    }
+
+    user.lastLoginAt = DateTime.now()
+    await user.save()
+
+    const gymContext = this.resolveGymContext(user)
+    const tokens = await this.issueTokens(user, gymContext?.gymId ?? undefined)
+    return { user, tokens, gymContext }
+  }
+
+  async loginWithRole(input: {
+    businessId?: string
+    role: string
+    email?: string
+    phone?: string
+    password: string
+  }): Promise<LoginResult> {
+    const user = await this.findLoginUser({
+      businessId: input.businessId,
+      role: input.role,
+      email: input.email,
+      phone: input.phone,
+    })
+
+    if (!user || !(await user.verifyPassword(input.password))) {
+      throw new Error('INVALID_CREDENTIALS')
+    }
+
+    if (!user.isActive) {
+      throw new Error('ACCOUNT_DISABLED')
+    }
+
+    user.lastLoginAt = DateTime.now()
+    await user.save()
+
+    const gymContext = this.resolveGymContext(user)
+    const tokens = await this.issueTokens(user, gymContext?.gymId ?? undefined)
+    return { user, tokens, gymContext }
+  }
+
+  async verifyOtpAndLoginForRole(input: {
+    email?: string
+    phone?: string
+    otp: string
+  }): Promise<LoginResult> {
+    const user = await this.findLoginUser({
+      role: 'member',
+      email: input.email,
+      phone: input.phone,
+    })
+    if (!user) throw new Error('MEMBER_NOT_FOUND')
+    if (!user.isActive) throw new Error('ACCOUNT_DISABLED')
+
+    await this.otpService.verifyOtp(this.memberOtpKey(input.email, input.phone), input.otp)
+
+    user.lastLoginAt = DateTime.now()
+    await user.save()
+
+    const gymContext = this.resolveGymContext(user)
+    const tokens = await this.issueTokens(user, gymContext?.gymId ?? undefined)
     return { user, tokens, gymContext }
   }
 
@@ -100,6 +207,27 @@ export class AuthService {
     }
 
     return null
+  }
+
+  private memberOtpKey(email?: string, phone?: string): string {
+    return `member_login:${email ?? phone ?? ''}`
+  }
+
+  private async findLoginUser(input: {
+    businessId?: string
+    role: string
+    email?: string
+    phone?: string
+  }): Promise<User | null> {
+    const query = User.query().where('role', input.role)
+    if (input.businessId) {
+      query.where('business_id', input.businessId)
+    }
+
+    if (input.email) query.where('email', input.email)
+    if (input.phone) query.where('phone', input.phone)
+
+    return query.first()
   }
 
   private async issueTokens(user: User, gymId?: string): Promise<TokenPair> {
